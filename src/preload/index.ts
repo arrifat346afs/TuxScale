@@ -9,6 +9,9 @@ const api = {
 
   selectFolder: () => ipcRenderer.invoke(ELECTRON_COMMANDS.SELECT_FOLDER),
 
+  getFolderVideos: (folderPath: string) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.GET_FOLDER_VIDEOS, folderPath),
+
   upscaleVideo: (payload: {
     videoPath: string
     outputPath?: string
@@ -16,7 +19,18 @@ const api = {
     scale: string
     ttaMode?: boolean
     tileSize?: number
+    outputFormat?: string
   }) => ipcRenderer.invoke(ELECTRON_COMMANDS.UPSCAYL_VIDEO, payload),
+
+  upscaleFolder: (payload: {
+    folderPath: string
+    outputPath?: string
+    model: string
+    scale: string
+    ttaMode?: boolean
+    tileSize?: number
+    outputFormat?: string
+  }) => ipcRenderer.invoke(ELECTRON_COMMANDS.FOLDER_UPSCAYL, payload),
 
   stopUpscaling: () => ipcRenderer.send(ELECTRON_COMMANDS.STOP),
 
@@ -60,7 +74,9 @@ const api = {
     return () => {
       ipcRenderer.removeListener(ELECTRON_COMMANDS.LOG, handler)
     }
-  }
+  },
+
+  getSystemInfo: () => ipcRenderer.invoke(ELECTRON_COMMANDS.GET_SYSTEM_INFO)
 }
 
 if (process.contextIsolated) {

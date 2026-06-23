@@ -1,4 +1,4 @@
-import { ImageFormat } from '@electron/types/types'
+type ImageFormat = 'png' | 'jpg' | 'jpeg' | 'webp'
 
 export type VideoUpscaylPayload = {
   videoPath: string
@@ -7,6 +7,31 @@ export type VideoUpscaylPayload = {
   scale: string
   ttaMode?: boolean
   tileSize?: number
+  outputFormat?: string
+}
+
+export type SystemInfo = {
+  os: {
+    platform: string
+    release: string
+    arch: string
+  }
+  cpu: {
+    model: string
+    cores: number
+  }
+  ram: {
+    total: string
+    free: string
+  }
+  gpu: {
+    name: string
+    vendor: string
+    vram: string
+    driverVersion: string
+    cudaCores: string
+    available: boolean
+  }
 }
 
 export type ImageUpscaylPayload = {

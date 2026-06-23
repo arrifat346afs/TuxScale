@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { ProgressData } from '../types'
+import type { SystemInfo } from '../../../../common/types/types'
 
 type UseUpscaleReturn = {
   activeTab: string
@@ -17,13 +18,17 @@ type UseUpscaleReturn = {
   setTtaMode: (tta: boolean) => void
   tileSize: string
   setTileSize: (tileSize: string) => void
+  outputFormat: string
+  setOutputFormat: (format: string) => void
   videoPath: string | null
   folderPath: string | null
+  folderVideoCount: number
   outputPath: string | null
   isProcessing: boolean
   progress: ProgressData | null
   logs: string[]
   videoName: string | null
+  systemInfo: SystemInfo | null
   handleVideoSelected: (path: string) => void
   handleSelectFolder: () => Promise<void>
   handleSelectOutputFolder: () => Promise<void>
@@ -39,20 +44,27 @@ export function useUpscale(): UseUpscaleReturn {
   const [models, setModels] = useState<string[]>([])
   const [scale, setScale] = useState([4])
   const [ttaMode, setTtaMode] = useState(false)
-  const [tileSize, setTileSize] = useState('0')
+  const [tileSize, setTileSize] = useState('256')
 
+  const [outputFormat, setOutputFormat] = useState('mp4')
   const [videoPath, setVideoPath] = useState<string | null>(null)
   const [folderPath, setFolderPath] = useState<string | null>(null)
+  const [folderVideoCount, setFolderVideoCount] = useState(0)
   const [outputPath, setOutputPath] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState<ProgressData | null>(null)
   const [logs, setLogs] = useState<string[]>([])
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null)
 
   useEffect(() => {
     window.api.getModelsList().then((list) => {
       setModels(list)
       if (list.length > 0) setModel(list[0])
     })
+    window.api
+      .getSystemInfo()
+      .then(setSystemInfo)
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -100,6 +112,12 @@ export function useUpscale(): UseUpscaleReturn {
       setFolderPath(path)
       setLogs([])
       setProgress(null)
+      try {
+        const videos = await window.api.getFolderVideos(path)
+        setFolderVideoCount(videos.length)
+      } catch {
+        setFolderVideoCount(0)
+      }
     }
   }, [])
 
@@ -123,8 +141,15 @@ export function useUpscale(): UseUpscaleReturn {
     setProgress(null)
 
     if (batchMode && folderPath) {
-      setLogs((prev) => [...prev, 'Batch processing not yet implemented in this version.'])
-      setIsProcessing(false)
+      await window.api.upscaleFolder({
+        folderPath,
+        outputPath: outputPath || undefined,
+        model,
+        scale: String(scale[0]),
+        ttaMode,
+        tileSize: parseInt(tileSize) || 0,
+        outputFormat
+      })
       return
     }
 
@@ -134,16 +159,17 @@ export function useUpscale(): UseUpscaleReturn {
       model,
       scale: String(scale[0]),
       ttaMode,
-      tileSize: parseInt(tileSize) || 0
+      tileSize: parseInt(tileSize) || 0,
+      outputFormat
     })
-  }, [batchMode, folderPath, videoPath, model, scale, outputPath, ttaMode, tileSize])
+  }, [batchMode, folderPath, videoPath, model, scale, outputPath, ttaMode, tileSize, outputFormat])
 
   const handleCancel = useCallback(() => {
     window.api.stopUpscaling()
     setIsProcessing(false)
   }, [])
 
-  const videoName = videoPath ? videoPath.split(/[/\\]/).pop() : null
+  const videoName = videoPath ? (videoPath.split(/[/\\]/).pop() ?? null) : null
 
   return {
     activeTab,
@@ -161,13 +187,17 @@ export function useUpscale(): UseUpscaleReturn {
     setTtaMode,
     tileSize,
     setTileSize,
+    outputFormat,
+    setOutputFormat,
     videoPath,
     folderPath,
+    folderVideoCount,
     outputPath,
     isProcessing,
     progress,
     logs,
     videoName,
+    systemInfo,
     handleVideoSelected,
     handleSelectFolder,
     handleSelectOutputFolder,

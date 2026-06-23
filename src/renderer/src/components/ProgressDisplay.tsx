@@ -1,6 +1,8 @@
 import { Button } from './ui/button'
 import { X } from 'lucide-react'
 import type { ProgressData } from '../types'
+import { IdleDisplay } from './IdleDisplay'
+import { BatchProgressHeader } from './BatchProgressHeader'
 
 type ProgressDisplayProps = {
   progress: ProgressData | null
@@ -8,6 +10,8 @@ type ProgressDisplayProps = {
   onCancel: () => void
   isProcessing: boolean
   videoName: string | null
+  folderPath: string | null
+  folderVideoCount: number
 }
 
 type ProgressStage = ProgressData['stage']
@@ -24,18 +28,17 @@ export const ProgressDisplay = ({
   logs,
   onCancel,
   isProcessing,
-  videoName
+  videoName,
+  folderPath,
+  folderVideoCount
 }: ProgressDisplayProps): React.ReactElement => {
   if (!progress && !isProcessing) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center space-y-2">
-          {videoName && <p className="text-lg font-medium">{videoName}</p>}
-          <p className="text-lg font-medium text-muted-foreground">
-            {videoName ? 'Ready to upscale' : 'Select a video and configure settings to begin'}
-          </p>
-        </div>
-      </div>
+      <IdleDisplay
+        videoName={videoName}
+        folderPath={folderPath}
+        folderVideoCount={folderVideoCount}
+      />
     )
   }
 
@@ -49,7 +52,11 @@ export const ProgressDisplay = ({
   return (
     <div className="flex h-full flex-col gap-6">
       <div className="text-center space-y-1">
-        {videoName && <p className="text-sm text-muted-foreground">{videoName}</p>}
+        {progress?.batchInfo ? (
+          <BatchProgressHeader batchInfo={progress.batchInfo} />
+        ) : (
+          videoName && <p className="text-sm text-muted-foreground">{videoName}</p>
+        )}
         <h2 className="text-xl font-bold">Video Upscaling</h2>
       </div>
 

@@ -4,4 +4,9 @@ export type ProgressData = {
   stage: 'extracting' | 'upscaling' | 'reassembling' | 'done'
   message?: string
   overall?: number
+  batchInfo?: {
+    currentVideo: number
+    totalVideos: number
+    videoName: string
+  }
 }

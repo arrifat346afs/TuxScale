@@ -17,6 +17,7 @@ const ELECTRON_COMMANDS = {
   FFMPEG_VIDEO_DONE: 'Ran FFMpeg successfully',
   FFMPEG_VIDEO_PROGRESS: 'Running FFMpeg for frame extraction',
   SELECT_CUSTOM_MODEL_FOLDER: 'Select a Custom Model Folder',
+  GET_FOLDER_VIDEOS: 'Get video files in a folder',
   GET_MODELS_LIST: 'Send models list from main to renderer',
   CUSTOM_MODEL_FILES_LIST: 'Send custom model files list to renderer',
   LOG: 'Log',
@@ -28,7 +29,8 @@ const ELECTRON_COMMANDS = {
   METADATA_ERROR: 'Metadata Error',
   PASTE_IMAGE: 'Paste Image from clipboard',
   PASTE_IMAGE_SAVE_SUCCESS: 'Clipboard Image saved successfully',
-  PASTE_IMAGE_SAVE_ERROR: 'Clipboard Image save failed'
+  PASTE_IMAGE_SAVE_ERROR: 'Clipboard Image save failed',
+  GET_SYSTEM_INFO: 'Get System Information'
 } as const
 
 export { ELECTRON_COMMANDS }

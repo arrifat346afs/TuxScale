@@ -21,13 +21,17 @@ function App(): React.JSX.Element {
     setTtaMode,
     tileSize,
     setTileSize,
+    outputFormat,
+    setOutputFormat,
     videoPath,
     folderPath,
+    folderVideoCount,
     outputPath,
     isProcessing,
     progress,
     logs,
     videoName,
+    systemInfo,
     handleVideoSelected,
     handleSelectFolder,
     handleSelectOutputFolder,
@@ -56,10 +60,13 @@ function App(): React.JSX.Element {
               onTtaModeChange={setTtaMode}
               tileSize={tileSize}
               onTileSizeChange={setTileSize}
+              outputFormat={outputFormat}
+              onOutputFormatChange={setOutputFormat}
               videoPath={videoPath}
               folderPath={folderPath}
               outputPath={outputPath}
               videoName={videoName}
+              systemInfo={systemInfo}
               onVideoSelected={handleVideoSelected}
               onSelectFolder={handleSelectFolder}
               onSelectOutputFolder={handleSelectOutputFolder}
@@ -75,6 +82,8 @@ function App(): React.JSX.Element {
             onCancel={handleCancel}
             isProcessing={isProcessing}
             videoName={videoName}
+            folderPath={folderPath}
+            folderVideoCount={folderVideoCount}
           />
         </main>
       </SidebarProvider>
