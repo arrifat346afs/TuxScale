@@ -1,7 +1,7 @@
 # TuxScale
 
 <p align="center">
-  <img src="Untitled.png" alt="TuxScale Screenshot" width="800" />
+  <img src="Untitled.png" alt="TuxScale Screenshot" width="100" />
 </p>
 
 AI-powered video upscaling application built with Electron, React, and TypeScript.
