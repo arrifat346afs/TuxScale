@@ -73,8 +73,8 @@ export const SidebarPanel = ({
   onScaleChange,
   // ttaMode,
   // onTtaModeChange,
-  tileSize,
-  onTileSizeChange,
+  // tileSize,
+  // onTileSizeChange,
   outputFormat,
   onOutputFormatChange,
   videoPath,
@@ -89,31 +89,31 @@ export const SidebarPanel = ({
   isProcessing
 }: SidebarPanelProps): React.ReactElement => {
   return (
-    <div className="flex h-screen w-88 flex-col border-r border-border bg-card text-card-foreground shadow-[2px_0_25px_-18px_rgba(0,0,0,0.55)]">
-      <div className="sticky top-0 z-30 border-b border-border/70 bg-card/95 backdrop-blur-sm">
+    <div className="flex h-screen w-88 flex-col border-r border-border bg-card text-card-foreground shadow-[2px_0_35px_-24px_rgba(0,0,0,0.45)]">
+      <div className="sticky top-0 z-30 border-b border-border/70 bg-card/95 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-5 py-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-background shadow-sm shadow-black/10">
-            <img src={tuxscaleLogo} alt="TuxScale" className="h-10 w-10 rounded-xl" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-3xl border border-border bg-background shadow-sm shadow-black/10">
+            <img src={tuxscaleLogo} alt="TuxScale" className="h-10 w-10 rounded-2xl" />
           </div>
           <div className="flex flex-col">
-            <span className="text-2xl font-bold leading-none">TuxScale</span>
+            <span className="text-2xl font-semibold leading-none">TuxScale</span>
             <span className="text-sm text-muted-foreground">AI Video Upscaler</span>
           </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={onActiveTabChange} className="w-full px-5 pb-4">
-          <TabsList className="mx-auto grid w-fit grid-cols-2 rounded-full p-1">
-            <TabsTrigger value="upscale" className="rounded-full">
+          <TabsList className="mx-auto grid w-fit grid-cols-2 rounded-full bg-muted/10 p-1.5 shadow-inner shadow-black/10">
+            <TabsTrigger value="upscale" className="rounded-full px-4 py-2">
               Upscale
             </TabsTrigger>
-            <TabsTrigger value="settings" className="rounded-full">
+            <TabsTrigger value="settings" className="rounded-full px-4 py-2">
               Settings
             </TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+      <div className="flex-1 overflow-y-auto p-5 space-y-6">
         {activeTab === 'upscale' ? (
           <>
             <div className="flex items-center gap-2">
@@ -123,8 +123,8 @@ export const SidebarPanel = ({
               </Label>
             </div>
 
-            <div className="space-y-2 rounded-[1.5rem] border border-border/60 bg-popover/80 p-4 shadow-sm shadow-black/5">
-              <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="space-y-3 rounded-[2rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+              <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Step 1
               </div>
               {batchMode ? (
@@ -157,18 +157,20 @@ export const SidebarPanel = ({
               )}
             </div>
 
-            <div className="space-y-4 rounded-[1.5rem] border border-border/60 bg-popover/80 p-4 shadow-sm shadow-black/5">
+            <div className="space-y-4 rounded-[2rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="space-y-1">
-                <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Step 2
                 </div>
                 <p className="text-xs text-muted-foreground">Select AI Model</p>
               </div>
 
               <Select value={model} onValueChange={onModelChange} disabled={isProcessing}>
-                <SelectTrigger className="w-full rounded-full">
-                  <Layers className="size-4" />
-                  <SelectValue placeholder="Select a model" />
+                <SelectTrigger className="w-full rounded-[1.5rem] border border-input/60 bg-background/90 px-4 py-3 text-sm font-medium text-foreground shadow-sm shadow-black/10 transition duration-200 hover:border-primary focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40">
+                  <div className="flex items-center gap-2">
+                    <Layers className="size-4 text-primary" />
+                    <SelectValue placeholder="Select a model" />
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
                   {models.map((modelName) => (
@@ -203,7 +205,7 @@ export const SidebarPanel = ({
                 <HelpCircle className="size-4 text-muted-foreground" />
               </div> */}
 
-              <div className="flex items-center gap-2">
+              {/* <div className="flex items-center gap-2">
                 <input
                   id="tile-size"
                   type="number"
@@ -212,14 +214,18 @@ export const SidebarPanel = ({
                   value={tileSize}
                   onChange={(e) => onTileSizeChange(e.target.value)}
                   disabled={isProcessing}
-                  className="w-20 h-8 rounded-md border border-input bg-background px-2 text-xs text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-24 h-10 rounded-2xl border border-input/60 bg-background/90 px-3 text-sm text-center transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <HelpCircle className="size-4 text-muted-foreground shrink-0" />
-              </div>
+              </div> */}
 
-              <div className="space-y-2">
-                <Label className="text-xs">Video Scale ({scale[0]}x)</Label>
+              <div className="rounded-2xl border border-border/50  p-2">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Video Scale</span>
+                  <span className="font-semibold text-foreground">{scale[0]}x</span>
+                </div>
                 <Slider
+                  className="h-12"
                   value={scale}
                   onValueChange={onScaleChange}
                   min={1}
@@ -230,9 +236,9 @@ export const SidebarPanel = ({
               </div>
             </div>
 
-            <div className="space-y-2 rounded-[1.5rem] border border-border/60 bg-popover/80 p-4 shadow-sm shadow-black/5">
+            <div className="space-y-3 rounded-[2rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="space-y-1">
-                <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Step 3
                 </div>
                 <p className="text-xs text-muted-foreground">Defaults to Video&apos;s path</p>
@@ -249,12 +255,12 @@ export const SidebarPanel = ({
               {outputPath && <p className="truncate text-xs text-muted-foreground">{outputPath}</p>}
             </div>
 
-            <div className="space-y-2 rounded-[1.5rem] border border-border/60 bg-popover/80 p-4 shadow-sm shadow-black/5">
-              <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="space-y-3 rounded-[2rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+              <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Step 4
               </div>
               <Button
-                className="w-full rounded-full bg-violet-600 hover:bg-violet-700"
+                className="w-full rounded-full bg-violet-600 hover:bg-violet-700 transition duration-200 hover:-translate-y-0.5"
                 onClick={onUpscale}
                 disabled={
                   isProcessing || (!batchMode && !videoPath) || (batchMode && !folderPath) || !model
