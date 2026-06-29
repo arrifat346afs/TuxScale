@@ -89,33 +89,31 @@ export const SidebarPanel = ({
   isProcessing
 }: SidebarPanelProps): React.ReactElement => {
   return (
-    <div className="flex h-screen min-w-85 max-w-85 flex-col border-r bg-card">
-      <div className="flex items-center gap-2 border-b px-5 py-4">
-        <div className="flex items-center justify-center rounded-lg">
-          <img
-            src={tuxscaleLogo}
-            alt="TuxScale"
-            className="size-16 border-2 border-accent rounded-lg"
-          />
+    <div className="flex h-screen w-88 flex-col border-r border-border bg-card text-card-foreground shadow-[2px_0_25px_-18px_rgba(0,0,0,0.55)]">
+      <div className="sticky top-0 z-30 border-b border-border/70 bg-card/95 backdrop-blur-sm">
+        <div className="flex items-center gap-3 px-5 py-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-background shadow-sm shadow-black/10">
+            <img src={tuxscaleLogo} alt="TuxScale" className="h-10 w-10 rounded-xl" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-2xl font-bold leading-none">TuxScale</span>
+            <span className="text-sm text-muted-foreground">AI Video Upscaler</span>
+          </div>
         </div>
-        <div className="flex flex-col">
-          <span className="text-2xl font-bold leading-none">TuxScale</span>
-          <span className="text-[15px] text-muted-foreground">AI Video Upscaler</span>
-        </div>
+
+        <Tabs value={activeTab} onValueChange={onActiveTabChange} className="w-full px-5 pb-4">
+          <TabsList className="mx-auto grid w-fit grid-cols-2 rounded-full p-1">
+            <TabsTrigger value="upscale" className="rounded-full">
+              Upscale
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="rounded-full">
+              Settings
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      <Tabs value={activeTab} onValueChange={onActiveTabChange} className="w-full px-5 pt-4">
-        <TabsList className="mx-auto grid w-fit grid-cols-2 rounded-full p-1">
-          <TabsTrigger value="upscale" className="rounded-full">
-            Upscale
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="rounded-full">
-            Settings
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto p-5 space-y-5">
         {activeTab === 'upscale' ? (
           <>
             <div className="flex items-center gap-2">
@@ -125,8 +123,10 @@ export const SidebarPanel = ({
               </Label>
             </div>
 
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Step 1</h3>
+            <div className="space-y-2 rounded-[1.5rem] border border-border/60 bg-popover/80 p-4 shadow-sm shadow-black/5">
+              <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Step 1
+              </div>
               {batchMode ? (
                 <Button
                   variant="secondary"
@@ -157,9 +157,11 @@ export const SidebarPanel = ({
               )}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-[1.5rem] border border-border/60 bg-popover/80 p-4 shadow-sm shadow-black/5">
               <div className="space-y-1">
-                <h3 className="text-sm font-semibold">Step 2</h3>
+                <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Step 2
+                </div>
                 <p className="text-xs text-muted-foreground">Select AI Model</p>
               </div>
 
@@ -228,9 +230,11 @@ export const SidebarPanel = ({
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-[1.5rem] border border-border/60 bg-popover/80 p-4 shadow-sm shadow-black/5">
               <div className="space-y-1">
-                <h3 className="text-sm font-semibold">Step 3</h3>
+                <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Step 3
+                </div>
                 <p className="text-xs text-muted-foreground">Defaults to Video&apos;s path</p>
               </div>
               <Button
@@ -245,8 +249,10 @@ export const SidebarPanel = ({
               {outputPath && <p className="truncate text-xs text-muted-foreground">{outputPath}</p>}
             </div>
 
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Step 4</h3>
+            <div className="space-y-2 rounded-[1.5rem] border border-border/60 bg-popover/80 p-4 shadow-sm shadow-black/5">
+              <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Step 4
+              </div>
               <Button
                 className="w-full rounded-full bg-violet-600 hover:bg-violet-700"
                 onClick={onUpscale}
