@@ -1,71 +1,81 @@
-id: io.github.arrifat346afs.TuxScale
-sdk: org.freedesktop.Sdk
+app-id: io.github.arrifat346afs.TuxScale
 runtime: org.freedesktop.Platform
 runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
 base: org.electronjs.Electron2.BaseApp
 base-version: '25.08'
-command: tuxscale-run
 separate-locales: false
+command: tuxscale-run
 
 finish-args:
   - --device=dri
   - --share=ipc
-  - --filesystem=host
-  - --share=network
+  - --filesystem=xdg-videos
+  - --filesystem=xdg-download
   - --socket=wayland
   - --socket=fallback-x11
   - --socket=pulseaudio
-  - --socket=session-bus
-  - --talk-name=org.freedesktop.DBus
-  - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
 
 modules:
-  - name: zypak
+  - name: upscayl-ncnn
+    buildsystem: simple
+    build-commands:
+      - mkdir -p _build
+      - cd _build && cmake ../src -DCMAKE_BUILD_TYPE=Release
+      - cd _build && cmake --build . -j $FLATPAK_BUILDER_N_JOBS
+      - install -Dm755 _build/upscayl-bin /app/bin/upscayl-bin
     sources:
       - type: git
-        url: https://github.com/refi64/zypak
-        tag: v2025.09
-        commit: 693a71c5ffa80ec9c9ce2ae03b1ccc493c698e53
+        url: https://github.com/arrifat346afs/upscayl-ncnn.git
+        commit: 0beb39028a0ddd83250e845b4c3333c0675e3b97
         x-checker-data:
-          type: git
-          tag-pattern: ^v([\d.]+)$
+          type: json
+          url: https://api.github.com/repos/arrifat346afs/upscayl-ncnn/releases/latest
+          tag-query: .tag_name
+          version-query: $tag
+          timestamp-query: .published_at
+      - type: git
+        url: https://github.com/Tencent/ncnn.git
+        commit: 6125c9f47cd14b589de0521350668cf9d3d37e3c
+        dest: src/ncnn
+      - type: git
+        url: https://github.com/webmproject/libwebp.git
+        commit: 8ea81561d2fdd382da60f57958741a7c23a18eb6
+        dest: src/libwebp
 
   - name: tuxscale
     buildsystem: simple
+    build-commands:
+      - mkdir -p resources/linux/bin
+      - cp /app/bin/upscayl-bin resources/linux/bin/upscayl-bin
+      - ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install --offline
+      - npx electron-vite build
+      - mkdir -p /app/tuxscale/resources
+      - cp -r out /app/tuxscale/
+      - cp package.json /app/tuxscale/
+      - cp -r node_modules /app/tuxscale/
+      - cp -r resources/models /app/tuxscale/resources/
+      - cp -r resources/linux /app/tuxscale/resources/
+      - install -Dm755 tuxscale-run /app/bin/
+      - install -Dm644 resources/icons/512x512.png /app/share/icons/hicolor/512x512/apps/io.github.arrifat346afs.TuxScale.png
+      - install -Dm644 resources/icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.arrifat346afs.TuxScale.png
+      - install -Dm644 io.github.arrifat346afs.TuxScale.metainfo.xml /app/share/metainfo/io.github.arrifat346afs.TuxScale.metainfo.xml
+      - install -Dm644 io.github.arrifat346afs.TuxScale.desktop /app/share/applications/io.github.arrifat346afs.TuxScale.desktop
+      - install -Dm644 LICENSE -t /app/share/licenses/io.github.arrifat346afs.TuxScale/
     sources:
-      - type: file
-        only-arches:
-          - x86_64
-        url: https://github.com/rifat/tuxscale/releases/download/v1.0.0/tuxscale-1.0.0-linux-x64.zip
-        sha256: PLACEHOLDER
+      - type: git
+        url: https://github.com/arrifat346afs/TuxScale
+        tag: v1.2.0
+        commit: 2780cc8fc23d9998166a9e1dc908edd6f064a654
         x-checker-data:
           type: json
-          url: https://api.github.com/repos/rifat/tuxscale/releases/latest
+          url: https://api.github.com/repos/arrifat346afs/TuxScale/releases/latest
           tag-query: .tag_name
           version-query: $tag | sub("^v"; "")
           timestamp-query: .published_at
-          url-query: '"https://github.com/rifat/tuxscale/releases/download/v" + $version + "/tuxscale-" + $version + "-linux-x64.zip"'
-        dest-filename: tuxscale-linux.zip
       - type: file
-        path: io.github.arrifat346afs.TuxScale.metainfo.xml
+        path: generated-sources.json
       - type: script
         dest-filename: tuxscale-run
         commands:
-          - zypak-wrapper /app/tuxscale/tuxscale --ozone-platform-hint=x11 --in-process-gpu
-    build-commands:
-      - install -d /app/tuxscale
-      - unzip tuxscale-linux.zip -d /app/tuxscale
-      - install tuxscale-run /app/bin/
-      - install -Dm644 /app/tuxscale/resources/512x512.png /app/share/icons/hicolor/512x512/apps/io.github.arrifat346afs.TuxScale.png
-      - install -Dm644 /app/tuxscale/resources/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.arrifat346afs.TuxScale.png
-      - install -Dp -m644 io.github.arrifat346afs.TuxScale.metainfo.xml /app/share/metainfo/io.github.arrifat346afs.TuxScale.metainfo.xml
-      - touch io.github.arrifat346afs.TuxScale.desktop
-      - desktop-file-edit --set-key=Exec --set-value="tuxscale-run %U" \
-                          --set-key=Icon --set-value=io.github.arrifat346afs.TuxScale \
-                          --set-key=Comment --set-value="Video upscaling application" \
-                          --set-key=Name --set-value="TuxScale" \
-                          --set-key=StartupNotify --set-value=false \
-                          --set-key=Categories --set-value="AudioVideo;Video;" \
-                          --set-key=Type --set-value=Application \
-                          io.github.arrifat346afs.TuxScale.desktop
-      - install -Dm644 io.github.arrifat346afs.TuxScale.desktop /app/share/applications/io.github.arrifat346afs.TuxScale.desktop
+          - cd /app/tuxscale && exec zypak-wrapper /app/electron/electron /app/tuxscale --ozone-platform-hint=auto --enable-features=WaylandWindowDecorations "$@"
