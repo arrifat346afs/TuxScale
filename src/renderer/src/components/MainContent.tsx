@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useMemo, useState } from 'react'
 import { FileVideo, Film, FolderOpen } from 'lucide-react'
+import { ReactCompareSlider } from 'react-compare-slider'
 import { Button } from './ui/button'
 import { ProgressDisplay } from './ProgressDisplay'
 import { IdleDisplay } from './IdleDisplay'
@@ -160,37 +161,32 @@ export function MainContent({
         />
       )}
 
-      {!batchMode && videoUrl && (
+      {!batchMode && videoUrl && !showComparison && (
         <div className="relative z-10 flex h-full w-full items-center justify-center p-8">
-          <div
-            className="w-full gap-4"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: showComparison ? '1fr 1fr' : '1fr',
-              transition: 'grid-template-columns 0.2s ease-out'
-            }}
-          >
-            <div className="flex min-w-0 flex-col gap-2">
-              {showComparison && <p className="text-center text-sm font-medium">Before</p>}
+          <video
+            key={`original-${videoUrl}`}
+            src={videoUrl}
+            controls
+            className="max-h-[70vh] max-w-full rounded-xl border shadow-sm"
+          />
+        </div>
+      )}
+
+      {showComparison && (
+        <div className="relative z-10 flex h-full w-full items-center justify-center p-8">
+          <ReactCompareSlider
+            itemOne={
+              <video src={videoUrl ?? undefined} controls className="h-full w-full rounded-xl" />
+            }
+            itemTwo={
               <video
-                key={`original-${videoUrl}`}
-                src={videoUrl}
+                src={upscaledVideoUrl ?? undefined}
                 controls
-                className="max-h-[70vh] max-w-full rounded-xl border shadow-sm"
+                className="h-full w-full rounded-xl"
               />
-            </div>
-            {upscaledVideoUrl && (
-              <div className="flex min-w-0 flex-col gap-2">
-                <p className="text-center text-sm font-medium">After Upscale</p>
-                <video
-                  key={`upscaled-${upscaledVideoUrl}`}
-                  src={upscaledVideoUrl}
-                  controls
-                  className="max-h-[70vh] max-w-full rounded-xl border shadow-sm"
-                />
-              </div>
-            )}
-          </div>
+            }
+            className="max-h-[70vh] max-w-full rounded-xl shadow-sm"
+          />
         </div>
       )}
 
