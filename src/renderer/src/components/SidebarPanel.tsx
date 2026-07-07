@@ -163,7 +163,7 @@ export const SidebarPanel = ({
 
             <div className="space-y-4 rounded-[0.5rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="space-y-1">
-                <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Step 2
                 </div>
                 <p className="text-xs text-muted-foreground">Select AI Model</p>
@@ -198,7 +198,7 @@ export const SidebarPanel = ({
                 <HelpCircle className="size-4 text-muted-foreground" />
               </div>
 
-              <div className="rounded-2xl border border-border/50  p-2">
+              <div className="rounded border border-border/50  p-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Video Scale</span>
                   <span className="font-semibold text-foreground">{scale[0]}x</span>
@@ -217,7 +217,7 @@ export const SidebarPanel = ({
 
             <div className="space-y-3 rounded-[0.5rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="space-y-1">
-                <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Step 3
                 </div>
                 <p className="text-xs text-muted-foreground">Defaults to Video&apos;s path</p>
@@ -235,7 +235,7 @@ export const SidebarPanel = ({
             </div>
 
             <div className="space-y-3 rounded-[0.5rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
-              <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Step 4
               </div>
               <Button
