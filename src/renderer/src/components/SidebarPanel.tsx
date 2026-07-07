@@ -198,31 +198,6 @@ export const SidebarPanel = ({
                 <HelpCircle className="size-4 text-muted-foreground" />
               </div>
 
-              {/* <div className="flex items-center gap-2">
-                <Switch
-                  id="tta-mode"
-                  checked={ttaMode}
-                  onCheckedChange={onTtaModeChange}
-                  disabled={isProcessing}
-                />
-
-                <HelpCircle className="size-4 text-muted-foreground" />
-              </div> */}
-
-              {/* <div className="flex items-center gap-2">
-                <input
-                  id="tile-size"
-                  type="number"
-                  min={0}
-                  step={32}
-                  value={tileSize}
-                  onChange={(e) => onTileSizeChange(e.target.value)}
-                  disabled={isProcessing}
-                  className="w-24 h-10 rounded-2xl border border-input/60 bg-background/90 px-3 text-sm text-center transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-                <HelpCircle className="size-4 text-muted-foreground shrink-0" />
-              </div> */}
-
               <div className="rounded-2xl border border-border/50  p-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Video Scale</span>
@@ -264,7 +239,7 @@ export const SidebarPanel = ({
                 Step 4
               </div>
               <Button
-                className="w-full rounded-full bg-violet-600 hover:bg-violet-700 transition duration-200 hover:-translate-y-0.5"
+                className="w-full rounded-full transition duration-200 hover:-translate-y-0.5"
                 onClick={onUpscale}
                 disabled={
                   isProcessing || (!batchMode && !videoPath) || (batchMode && !folderPath) || !model
