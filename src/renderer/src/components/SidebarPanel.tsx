@@ -106,11 +106,11 @@ export const SidebarPanel = ({
         </div>
 
         <Tabs value={activeTab} onValueChange={onActiveTabChange} className="w-full px-5 pb-4">
-          <TabsList className="mx-auto grid w-fit grid-cols-2 rounded-full bg-muted/10 p-1.5 shadow-inner shadow-black/10">
-            <TabsTrigger value="upscale" className="rounded-full px-4 py-2">
+          <TabsList className="mx-auto grid w-fit grid-cols-2  bg-muted/10 p-1.5 shadow-inner shadow-black/10">
+            <TabsTrigger value="upscale" className="px-4 py-2">
               Upscale
             </TabsTrigger>
-            <TabsTrigger value="settings" className="rounded-full px-4 py-2">
+            <TabsTrigger value="settings" className="px-4 py-2">
               Settings
             </TabsTrigger>
           </TabsList>
@@ -127,8 +127,8 @@ export const SidebarPanel = ({
               </Label>
             </div>
 
-            <div className="space-y-3 rounded-[2rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
-              <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="space-y-3 rounded-[0.5rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+              <div className="inline-flex items-center   bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Step 1
               </div>
               {batchMode ? (
@@ -161,7 +161,7 @@ export const SidebarPanel = ({
               )}
             </div>
 
-            <div className="space-y-4 rounded-[2rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+            <div className="space-y-4 rounded-[0.5rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Step 2
@@ -170,7 +170,7 @@ export const SidebarPanel = ({
               </div>
 
               <Select value={model} onValueChange={onModelChange} disabled={isProcessing}>
-                <SelectTrigger className="w-full rounded-[1.5rem] border border-input/60 bg-background/90 px-4 py-3 text-sm font-medium text-foreground shadow-sm shadow-black/10 transition duration-200 hover:border-primary focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40">
+                <SelectTrigger className="w-full rounded-[0.5rem] border border-input/60 bg-background/90 px-4 py-3 text-sm font-medium text-foreground shadow-sm shadow-black/10 transition duration-200 hover:border-primary focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40">
                   <div className="flex items-center gap-2">
                     <Layers className="size-4 text-primary" />
                     <SelectValue placeholder="Select a model" />
@@ -179,7 +179,7 @@ export const SidebarPanel = ({
                 <SelectContent>
                   {models.map((modelName) => (
                     <SelectItem key={modelName} value={modelName}>
-                      {modelName}
+                      {modelName.replace(/-/g, ' ').toUpperCase()}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -215,7 +215,7 @@ export const SidebarPanel = ({
               </div>
             </div>
 
-            <div className="space-y-3 rounded-[2rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+            <div className="space-y-3 rounded-[0.5rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="space-y-1">
                 <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Step 3
@@ -234,7 +234,7 @@ export const SidebarPanel = ({
               {outputPath && <p className="truncate text-xs text-muted-foreground">{outputPath}</p>}
             </div>
 
-            <div className="space-y-3 rounded-[2rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+            <div className="space-y-3 rounded-[0.5rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="inline-flex items-center gap-2 rounded-full bg-muted/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Step 4
               </div>
@@ -393,10 +393,6 @@ export const SidebarPanel = ({
             </div>
           </div>
         )}
-      </div>
-
-      <div className="border-t px-5 py-3 text-center text-[10px] text-muted-foreground">
-        Drop videos on the right or use the buttons above
       </div>
     </div>
   )
