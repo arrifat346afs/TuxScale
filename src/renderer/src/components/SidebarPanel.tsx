@@ -24,7 +24,8 @@ import {
   HardDrive,
   CheckCircle2,
   XCircle,
-  FileVideo
+  FileVideo,
+  Download
 } from 'lucide-react'
 import type { SystemInfo } from '../../../../common/types/types'
 import tuxscaleLogo from '../assets/tuxscale-logo.png'
@@ -59,6 +60,10 @@ type SidebarPanelProps = {
   onSelectOutputFolder: () => void
   onUpscale: () => void
   isProcessing: boolean
+  updateState: string
+  updateInfo: { version?: string; percent?: number; error?: string }
+  onCheckForUpdates: () => void
+  onInstallUpdate: () => void
 }
 
 export const SidebarPanel = ({
@@ -90,7 +95,11 @@ export const SidebarPanel = ({
   onSelectFolder,
   onSelectOutputFolder,
   onUpscale,
-  isProcessing
+  isProcessing,
+  updateState,
+  updateInfo,
+  onCheckForUpdates,
+  onInstallUpdate
 }: SidebarPanelProps): React.ReactElement => {
   return (
     <div className="flex h-screen w-88 flex-col border-r border-border bg-card text-card-foreground shadow-[2px_0_35px_-24px_rgba(0,0,0,0.45)]">
@@ -127,7 +136,7 @@ export const SidebarPanel = ({
               </Label>
             </div>
 
-            <div className="space-y-3 rounded-[0.5rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+            <div className="space-y-3 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="inline-flex items-center   bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Step 1
               </div>
@@ -161,7 +170,7 @@ export const SidebarPanel = ({
               )}
             </div>
 
-            <div className="space-y-4 rounded-[0.5rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+            <div className="space-y-4 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="space-y-1">
                 <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Step 2
@@ -170,7 +179,7 @@ export const SidebarPanel = ({
               </div>
 
               <Select value={model} onValueChange={onModelChange} disabled={isProcessing}>
-                <SelectTrigger className="w-full rounded-[0.5rem] border border-input/60 bg-background/90 px-4 py-3 text-sm font-medium text-foreground shadow-sm shadow-black/10 transition duration-200 hover:border-primary focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40">
+                <SelectTrigger>
                   <div className="flex items-center gap-2">
                     <Layers className="size-4 text-primary" />
                     <SelectValue placeholder="Select a model" />
@@ -215,7 +224,7 @@ export const SidebarPanel = ({
               </div>
             </div>
 
-            <div className="space-y-3 rounded-[0.5rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+            <div className="space-y-3 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="space-y-1">
                 <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Step 3
@@ -234,7 +243,7 @@ export const SidebarPanel = ({
               {outputPath && <p className="truncate text-xs text-muted-foreground">{outputPath}</p>}
             </div>
 
-            <div className="space-y-3 rounded-[0.5rem] border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+            <div className="space-y-3 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Step 4
               </div>
@@ -316,6 +325,69 @@ export const SidebarPanel = ({
             </div>
 
             <div className="flex-1" />
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                Updates
+              </h3>
+              <div className="rounded-xl border bg-card p-3 text-sm space-y-2">
+                <p className="text-xs text-muted-foreground">Current version: v{__APP_VERSION__}</p>
+                {updateState === 'idle' && (
+                  <Button
+                    variant="secondary"
+                    className="w-full rounded-full"
+                    onClick={onCheckForUpdates}
+                  >
+                    <Download />
+                    Check for Updates
+                  </Button>
+                )}
+                {updateState === 'checking' && (
+                  <Button variant="secondary" className="w-full rounded-full" disabled>
+                    Checking for updates...
+                  </Button>
+                )}
+                {updateState === 'available' && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-emerald-500">
+                      Update v{updateInfo.version} available — downloading...
+                    </p>
+                  </div>
+                )}
+                {updateState === 'downloading' && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-emerald-500">
+                      Downloading... {updateInfo.percent?.toFixed(1)}%
+                    </p>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all duration-300"
+                        style={{ width: `${updateInfo.percent ?? 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+                {updateState === 'downloaded' && (
+                  <Button className="w-full rounded-full" onClick={onInstallUpdate}>
+                    <Download />
+                    Restart & Install v{updateInfo.version}
+                  </Button>
+                )}
+                {updateState === 'error' && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-red-500">{updateInfo.error}</p>
+                    <Button
+                      variant="secondary"
+                      className="w-full rounded-full"
+                      onClick={onCheckForUpdates}
+                    >
+                      <Download />
+                      Retry
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div className="space-y-3">
               <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">

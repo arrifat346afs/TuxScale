@@ -4,7 +4,8 @@
   "description": "TuxScale - Video upscaling application",
   "main": "./out/main/index.js",
   "author": "TuxScale",
-  "homepage": "https://github.com/rifat/tuxscale",
+  "repository": "github:arrifat346afs/TuxScale",
+  "homepage": "https://github.com/arrifat346afs/TuxScale",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",

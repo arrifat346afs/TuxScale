@@ -31,7 +31,15 @@ const ELECTRON_COMMANDS = {
   PASTE_IMAGE_SAVE_SUCCESS: 'Clipboard Image saved successfully',
   PASTE_IMAGE_SAVE_ERROR: 'Clipboard Image save failed',
   GET_SYSTEM_INFO: 'Get System Information',
-  GET_VIDEO_URL: 'Get video URL'
+  GET_VIDEO_URL: 'Get video URL',
+  UPDATE_CHECKING: 'Update Checking',
+  CHECK_FOR_UPDATES: 'Check for Updates',
+  INSTALL_UPDATE: 'Install Update',
+  UPDATE_AVAILABLE: 'Update Available',
+  UPDATE_NOT_AVAILABLE: 'Update Not Available',
+  UPDATE_ERROR: 'Update Error',
+  UPDATE_DOWNLOAD_PROGRESS: 'Update Download Progress',
+  UPDATE_DOWNLOADED: 'Update Downloaded'
 } as const
 
 export { ELECTRON_COMMANDS }

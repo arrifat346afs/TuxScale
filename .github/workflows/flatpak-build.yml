@@ -1,0 +1,77 @@
+name: Flatpak Build Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  flatpak-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find manifest file
+        run: |
+          MANIFEST=$(ls *.yml | head -1)
+          echo "MANIFEST=$MANIFEST" >> $GITHUB_ENV
+          echo "Using manifest: $MANIFEST"
+
+      - name: Install Flatpak dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --noninteractive flathub org.freedesktop.Platform//25.08
+          flatpak install --noninteractive flathub org.freedesktop.Sdk//25.08
+          flatpak install --noninteractive flathub org.electronjs.Electron2.BaseApp//25.08
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install and build Electron app
+        run: |
+          npm install
+          npm run build
+
+      - name: Package app and generate local manifest
+        run: |
+          APP_ID=$(grep '^app-id:' $MANIFEST | awk '{print $2}')
+          echo "APP_ID=$APP_ID" >> $GITHUB_ENV
+
+          ZIP="dist/tuxscale-linux-x64.zip"
+          npx electron-builder --linux zip
+          SHA256=$(sha256sum "$ZIP" | cut -d' ' -f1)
+          cp "$ZIP" flatpak/tuxscale-linux.zip
+
+          perl -0pe 's/\\\n\s{2,}//g' "$MANIFEST" | \
+            sed "s|url: https://github.com/.*TuxScale/releases/download/.*|path: tuxscale-linux.zip|; \
+                 s|sha256: [a-f0-9]*|sha256: $SHA256|" \
+            > "flatpak/local.yml"
+          echo "LOCAL_MANIFEST=flatpak/local.yml" >> $GITHUB_ENV
+
+      - name: Validate manifest
+        run: |
+          flatpak run --command=flatpak-builder-lint org.flatpak.Builder \
+            manifest $LOCAL_MANIFEST
+
+      - name: Build Flatpak
+        run: |
+          flatpak-builder --force-clean flatpak/build-dir $LOCAL_MANIFEST
+
+      - name: Install and run test
+        run: |
+          flatpak-builder --user --install --force-clean flatpak/build-dir $LOCAL_MANIFEST
+          flatpak run $APP_ID --help || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-build-dir
+          path: flatpak/build-dir
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-build-logs
+          path: flatpak/build-dir/.flatpak-builder/logs/

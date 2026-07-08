@@ -2,6 +2,15 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import type { ProgressData } from '../types'
 import type { SystemInfo } from '../../../../common/types/types'
 
+type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error'
+
+type UpdateInfo = {
+  version?: string
+  percent?: number
+  bytesPerSecond?: number
+  error?: string
+}
+
 const VIDEO_OUTPUT_EXTENSIONS = ['mp4', 'webm', 'mkv', 'avi', 'mov']
 
 function isVideoOutputPath(path: string): boolean {
@@ -45,6 +54,10 @@ type UseUpscaleReturn = {
   handleSelectOutputFolder: () => Promise<void>
   handleUpscale: () => Promise<void>
   handleCancel: () => void
+  updateState: UpdateState
+  updateInfo: UpdateInfo
+  handleCheckForUpdates: () => Promise<void>
+  handleInstallUpdate: () => void
 }
 
 export function useUpscale(): UseUpscaleReturn {
@@ -70,6 +83,8 @@ export function useUpscale(): UseUpscaleReturn {
   const [progress, setProgress] = useState<ProgressData | null>(null)
   const [logs, setLogs] = useState<string[]>([])
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null)
+  const [updateState, setUpdateState] = useState<UpdateState>('idle')
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo>({})
   const batchModeRef = useRef(batchMode)
 
   const handleBatchModeChange = useCallback((batch: boolean) => {
@@ -130,6 +145,48 @@ export function useUpscale(): UseUpscaleReturn {
     cleanupFns.push(
       window.api.onLog((message) => {
         setLogs((prev) => [...prev, message])
+      })
+    )
+
+    cleanupFns.push(
+      window.api.onUpdateChecking(() => {
+        setUpdateState('checking')
+        setUpdateInfo({})
+      })
+    )
+
+    cleanupFns.push(
+      window.api.onUpdateAvailable((data) => {
+        setUpdateState('available')
+        setUpdateInfo({ version: data.version })
+      })
+    )
+
+    cleanupFns.push(
+      window.api.onUpdateNotAvailable(() => {
+        setUpdateState('idle')
+        setUpdateInfo({})
+      })
+    )
+
+    cleanupFns.push(
+      window.api.onUpdateError((data) => {
+        setUpdateState('error')
+        setUpdateInfo({ error: data.message })
+      })
+    )
+
+    cleanupFns.push(
+      window.api.onUpdateDownloadProgress((data) => {
+        setUpdateState('downloading')
+        setUpdateInfo({ percent: data.percent, bytesPerSecond: data.bytesPerSecond })
+      })
+    )
+
+    cleanupFns.push(
+      window.api.onUpdateDownloaded((data) => {
+        setUpdateState('downloaded')
+        setUpdateInfo({ version: data.version })
       })
     )
 
@@ -230,6 +287,16 @@ export function useUpscale(): UseUpscaleReturn {
     setIsProcessing(false)
   }, [])
 
+  const handleCheckForUpdates = useCallback(async () => {
+    setUpdateState('checking')
+    setUpdateInfo({})
+    await window.api.checkForUpdates()
+  }, [])
+
+  const handleInstallUpdate = useCallback(() => {
+    window.api.installUpdate()
+  }, [])
+
   const videoName = videoPath ? (videoPath.split(/[/\\]/).pop() ?? null) : null
 
   return {
@@ -267,6 +334,10 @@ export function useUpscale(): UseUpscaleReturn {
     handleSelectFolder,
     handleSelectOutputFolder,
     handleUpscale,
-    handleCancel
+    handleCancel,
+    updateState,
+    updateInfo,
+    handleCheckForUpdates,
+    handleInstallUpdate
   }
 }

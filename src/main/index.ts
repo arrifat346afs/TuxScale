@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import path, { join } from 'path'
 import fs from 'fs'
 import http from 'http'
@@ -366,6 +367,72 @@ function registerIpcHandlers(): void {
   })
 }
 
+function setupAutoUpdater(): void {
+  if (!is.dev) {
+    autoUpdater.autoDownload = true
+    autoUpdater.autoInstallOnAppQuit = true
+
+    autoUpdater.on('checking-for-update', () => {
+      mainWindow?.webContents.send(ELECTRON_COMMANDS.UPDATE_CHECKING)
+    })
+
+    autoUpdater.on('update-available', (info) => {
+      mainWindow?.webContents.send(ELECTRON_COMMANDS.UPDATE_AVAILABLE, {
+        version: info.version,
+        releaseDate: info.releaseDate,
+        releaseName: info.releaseName
+      })
+    })
+
+    autoUpdater.on('update-not-available', () => {
+      mainWindow?.webContents.send(ELECTRON_COMMANDS.UPDATE_NOT_AVAILABLE)
+    })
+
+    autoUpdater.on('error', (error) => {
+      mainWindow?.webContents.send(ELECTRON_COMMANDS.UPDATE_ERROR, {
+        message: error?.message ?? 'Unknown update error'
+      })
+    })
+
+    autoUpdater.on('download-progress', (progress) => {
+      mainWindow?.webContents.send(ELECTRON_COMMANDS.UPDATE_DOWNLOAD_PROGRESS, {
+        percent: progress.percent,
+        bytesPerSecond: progress.bytesPerSecond,
+        transferred: progress.transferred,
+        total: progress.total
+      })
+    })
+
+    autoUpdater.on('update-downloaded', (info) => {
+      mainWindow?.webContents.send(ELECTRON_COMMANDS.UPDATE_DOWNLOADED, {
+        version: info.version,
+        releaseDate: info.releaseDate,
+        releaseName: info.releaseName
+      })
+    })
+  }
+}
+
+function registerUpdateHandlers(): void {
+  ipcMain.handle(ELECTRON_COMMANDS.CHECK_FOR_UPDATES, async () => {
+    if (is.dev) {
+      return { error: 'Cannot check for updates in development mode' }
+    }
+    try {
+      const result = await autoUpdater.checkForUpdates()
+      return { updateAvailable: !!result?.updateInfo }
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : 'Failed to check for updates'
+      }
+    }
+  })
+
+  ipcMain.handle(ELECTRON_COMMANDS.INSTALL_UPDATE, () => {
+    autoUpdater.quitAndInstall()
+  })
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('io.github.arrifat346afs.TuxScale')
 
@@ -374,8 +441,10 @@ app.whenReady().then(() => {
   })
 
   registerIpcHandlers()
+  registerUpdateHandlers()
 
   createWindow()
+  setupAutoUpdater()
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

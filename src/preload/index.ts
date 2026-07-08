@@ -81,7 +81,87 @@ const api = {
     }
   },
 
-  getSystemInfo: () => ipcRenderer.invoke(ELECTRON_COMMANDS.GET_SYSTEM_INFO)
+  getSystemInfo: () => ipcRenderer.invoke(ELECTRON_COMMANDS.GET_SYSTEM_INFO),
+
+  checkForUpdates: () => ipcRenderer.invoke(ELECTRON_COMMANDS.CHECK_FOR_UPDATES),
+
+  installUpdate: () => ipcRenderer.invoke(ELECTRON_COMMANDS.INSTALL_UPDATE),
+
+  onUpdateChecking: (callback: () => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on(ELECTRON_COMMANDS.UPDATE_CHECKING, handler)
+    return () => {
+      ipcRenderer.removeListener(ELECTRON_COMMANDS.UPDATE_CHECKING, handler)
+    }
+  },
+
+  onUpdateAvailable: (
+    callback: (data: { version: string; releaseDate?: string; releaseName?: string }) => void
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { version: string; releaseDate?: string; releaseName?: string }
+    ): void => {
+      callback(data)
+    }
+    ipcRenderer.on(ELECTRON_COMMANDS.UPDATE_AVAILABLE, handler)
+    return () => {
+      ipcRenderer.removeListener(ELECTRON_COMMANDS.UPDATE_AVAILABLE, handler)
+    }
+  },
+
+  onUpdateNotAvailable: (callback: () => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on(ELECTRON_COMMANDS.UPDATE_NOT_AVAILABLE, handler)
+    return () => {
+      ipcRenderer.removeListener(ELECTRON_COMMANDS.UPDATE_NOT_AVAILABLE, handler)
+    }
+  },
+
+  onUpdateError: (callback: (data: { message: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: { message: string }): void => {
+      callback(data)
+    }
+    ipcRenderer.on(ELECTRON_COMMANDS.UPDATE_ERROR, handler)
+    return () => {
+      ipcRenderer.removeListener(ELECTRON_COMMANDS.UPDATE_ERROR, handler)
+    }
+  },
+
+  onUpdateDownloadProgress: (
+    callback: (data: {
+      percent: number
+      bytesPerSecond: number
+      transferred: number
+      total: number
+    }) => void
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { percent: number; bytesPerSecond: number; transferred: number; total: number }
+    ): void => {
+      callback(data)
+    }
+    ipcRenderer.on(ELECTRON_COMMANDS.UPDATE_DOWNLOAD_PROGRESS, handler)
+    return () => {
+      ipcRenderer.removeListener(ELECTRON_COMMANDS.UPDATE_DOWNLOAD_PROGRESS, handler)
+    }
+  },
+
+  onUpdateDownloaded: (
+    callback: (data: { version: string; releaseDate?: string; releaseName?: string }) => void
+  ) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      data: { version: string; releaseDate?: string; releaseName?: string }
+    ): void => {
+      callback(data)
+    }
+    ipcRenderer.on(ELECTRON_COMMANDS.UPDATE_DOWNLOADED, handler)
+    return () => {
+      ipcRenderer.removeListener(ELECTRON_COMMANDS.UPDATE_DOWNLOADED, handler)
+    }
+  }
 }
 
 if (process.contextIsolated) {

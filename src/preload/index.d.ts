@@ -35,6 +35,33 @@ interface Api {
   onError: (callback: (data: { message: string }) => void) => () => void
   onLog: (callback: (message: string) => void) => () => void
   getSystemInfo: () => Promise<SystemInfo>
+
+  checkForUpdates: () => Promise<{ updateAvailable?: boolean; error?: string }>
+
+  installUpdate: () => void
+
+  onUpdateChecking: (callback: () => void) => () => void
+
+  onUpdateAvailable: (
+    callback: (data: { version: string; releaseDate?: string; releaseName?: string }) => void
+  ) => () => void
+
+  onUpdateNotAvailable: (callback: () => void) => () => void
+
+  onUpdateError: (callback: (data: { message: string }) => void) => () => void
+
+  onUpdateDownloadProgress: (
+    callback: (data: {
+      percent: number
+      bytesPerSecond: number
+      transferred: number
+      total: number
+    }) => void
+  ) => () => void
+
+  onUpdateDownloaded: (
+    callback: (data: { version: string; releaseDate?: string; releaseName?: string }) => void
+  ) => () => void
 }
 
 declare global {

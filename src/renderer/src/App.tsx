@@ -39,7 +39,11 @@ function App(): React.JSX.Element {
     handleSelectFolder,
     handleSelectOutputFolder,
     handleUpscale,
-    handleCancel
+    handleCancel,
+    updateState,
+    updateInfo,
+    handleCheckForUpdates,
+    handleInstallUpdate
   } = useUpscale()
 
   return (
@@ -75,6 +79,10 @@ function App(): React.JSX.Element {
           onSelectOutputFolder={handleSelectOutputFolder}
           onUpscale={handleUpscale}
           isProcessing={isProcessing}
+          updateState={updateState}
+          updateInfo={updateInfo}
+          onCheckForUpdates={handleCheckForUpdates}
+          onInstallUpdate={handleInstallUpdate}
         />
         <MainContent
           batchMode={batchMode}
