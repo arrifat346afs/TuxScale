@@ -9,20 +9,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Find manifest file
-        run: |
-          MANIFEST=$(ls *.yml | head -1)
-          echo "MANIFEST=$MANIFEST" >> $GITHUB_ENV
-          echo "Using manifest: $MANIFEST"
-
-      - name: Install Flatpak dependencies
+      - name: Install Flatpak
         run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
-          flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak --user install --noninteractive flathub org.freedesktop.Platform//25.08
-          flatpak --user install --noninteractive flathub org.freedesktop.Sdk//25.08
-          flatpak --user install --noninteractive flathub org.electronjs.Electron2.BaseApp//25.08
+          sudo apt-get install -y flatpak-builder
 
       - uses: actions/setup-node@v4
         with:
@@ -35,11 +25,12 @@ jobs:
 
       - name: Package app and generate local manifest
         run: |
+          MANIFEST=$(ls *.yml | head -1)
           APP_ID=$(grep '^app-id:' $MANIFEST | awk '{print $2}')
           echo "APP_ID=$APP_ID" >> $GITHUB_ENV
 
-          ZIP="dist/tuxscale-linux-x64.zip"
           npx electron-builder --linux zip
+          ZIP=$(ls dist/tuxscale-*.zip | head -1)
           SHA256=$(sha256sum "$ZIP" | cut -d' ' -f1)
           cp "$ZIP" flatpak/tuxscale-linux.zip
 
@@ -47,25 +38,12 @@ jobs:
             sed "s|url: https://github.com/.*TuxScale/releases/download/.*|path: tuxscale-linux.zip|; \
                  s|sha256: [a-f0-9]*|sha256: $SHA256|" \
             > "flatpak/local.yml"
-          echo "LOCAL_MANIFEST=flatpak/local.yml" >> $GITHUB_ENV
 
       - name: Build Flatpak
-        run: |
-          flatpak-builder --user --force-clean --install flatpak/build-dir $LOCAL_MANIFEST
-
-      - name: Run smoke test
-        run: |
-          flatpak run $APP_ID --help || true
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          name: flatpak-build-dir
-          path: flatpak/build-dir
-
-      - name: Upload logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: flatpak-build-logs
-          path: flatpak/build-dir/.flatpak-builder/logs/
+          bundle: TuxScale.flatpak
+          manifest-path: flatpak/local.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: true
+          artifact-name: TuxScale-x86_64.flatpak
