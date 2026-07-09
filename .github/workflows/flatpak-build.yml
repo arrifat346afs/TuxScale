@@ -25,19 +25,14 @@ jobs:
 
       - name: Package app and generate local manifest
         run: |
-          MANIFEST=$(ls *.yml | head -1)
-          APP_ID=$(grep '^app-id:' $MANIFEST | awk '{print $2}')
-          echo "APP_ID=$APP_ID" >> $GITHUB_ENV
-
-          npx electron-builder --linux zip
+          npx electron-builder --linux zip --publish=never
           ZIP=$(ls dist/tuxscale-*.zip | head -1)
           SHA256=$(sha256sum "$ZIP" | cut -d' ' -f1)
           cp "$ZIP" flatpak/tuxscale-linux.zip
-
-          perl -0pe 's/\\\n\s{2,}//g' "$MANIFEST" | \
-            sed "s|url: https://github.com/.*TuxScale/releases/download/.*|path: tuxscale-linux.zip|; \
-                 s|sha256: [a-f0-9]*|sha256: $SHA256|" \
-            > "flatpak/local.yml"
+          APP_ID=$(grep '^app-id:' io.github.arrifat346afs.TuxScale.yml | awk '{print $2}')
+          echo "APP_ID=$APP_ID" >> $GITHUB_ENV
+          sed "s|path: .*|path: tuxscale-linux.zip|; s|sha256: [a-f0-9]*|sha256: $SHA256|" \
+            io.github.arrifat346afs.TuxScale.yml > flatpak/local.yml
 
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
