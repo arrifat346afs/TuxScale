@@ -1,16 +1,16 @@
 <div align="center">
   <img src="Untitled.png" alt="TuxScale Logo" width="120" />
 </div>
-
-<div align="center">
-  <img src="/screenshots/screenshot_20260710_102004-region.png" alt="TuxScale Screenshot" width="900" />
-</div>
-
 <h1 align="center">🐧 TuxScale</h1>
 
 <p align="center">
   <strong>AI-powered video upscaling for Linux</strong>
 </p>
+
+<div align="center">
+  <img src="/screenshots/screenshot_20260710_102004-region.png" alt="TuxScale Screenshot" width="900" />
+</div>
+
 
 <p align="center">
   <img src="https://img.shields.io/badge/electron-42.5-blue?logo=electron" alt="Electron" />
