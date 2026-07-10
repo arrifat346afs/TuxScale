@@ -3,7 +3,7 @@
 </div>
 
 <div align="center">
-  <img src="/screenshots/screenshot_20260710_102004-region.png" alt="TuxScale Screenshot" width="600" />
+  <img src="/screenshots/screenshot_20260710_102004-region.png" alt="TuxScale Screenshot" width="800" />
 </div>
 
 <h1 align="center">🐧 TuxScale</h1>
