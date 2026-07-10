@@ -7,11 +7,6 @@
   <strong>AI-powered video upscaling for Linux</strong>
 </p>
 
-<div align="center">
-  <img src="/screenshots/screenshot_20260710_102004-region.png" alt="TuxScale Screenshot" width="900" />
-</div>
-
-
 <p align="center">
   <img src="https://img.shields.io/badge/electron-42.5-blue?logo=electron" alt="Electron" />
   <img src="https://img.shields.io/badge/react-19.2-61DAFB?logo=react" alt="React" />
@@ -20,6 +15,11 @@
   <img src="https://img.shields.io/badge/tailwindcss-4.3-06B6D4?logo=tailwindcss" alt="Tailwind CSS" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
 </p>
+<div align="center">
+  <img src="/screenshots/screenshot_20260710_102004-region.png" alt="TuxScale Screenshot" width="900" />
+</div>
+
+
 
 ---
 
