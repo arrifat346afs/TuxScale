@@ -42,8 +42,8 @@ modules:
     build-commands:
       - mkdir -p resources/linux/bin
       - cp /app/bin/upscayl-bin resources/linux/bin/upscayl-bin
-      - ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --offline
-      - pnpm exec electron-vite build
+      - ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install --offline
+      - npx electron-vite build
       - mkdir -p /app/tuxscale/resources
       - cp -r out /app/tuxscale/
       - cp package.json /app/tuxscale/
