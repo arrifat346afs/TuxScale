@@ -1,22 +1,48 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>io.github.arrifat346afs.TuxScale</id>
+
+  <developer id="io.github.arrifat346afs">
+    <name>Abdur Rahman Rifat</name>
+  </developer>
+
   <name>TuxScale</name>
-  <summary>Video upscaling application powered by AI</summary>
+  <summary>AI-powered video upscaling application</summary>
+
+  <metadata_license>FSFAP</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
 
   <url type="homepage">https://github.com/arrifat346afs/TuxScale</url>
   <url type="bugtracker">https://github.com/arrifat346afs/TuxScale/issues</url>
-
-  <metadata_license>FSFAP</metadata_license>
-  <project_license>AGPL-3.0</project_license>
+  <url type="vcs-browser">https://github.com/arrifat346afs/TuxScale</url>
 
   <description>
-    <p>TuxScale is a free and open source video upscaling application powered by AI.</p>
+    <p>
+      TuxScale is a free and open source AI-powered video upscaling
+      application for Linux.
+    </p>
+
+    <p>
+      It uses modern AI models to enhance video quality by increasing
+      resolution while preserving details. TuxScale provides an intuitive
+      graphical interface for selecting videos, configuring AI models,
+      and exporting enhanced results.
+    </p>
+
+    <ul>
+      <li>Upscale videos using AI models</li>
+      <li>Simple and modern graphical interface</li>
+      <li>Multiple AI model support</li>
+      <li>Open source and privacy-friendly</li>
+      <li>Designed for Linux desktops</li>
+    </ul>
   </description>
 
-  <content_rating type="oars-1.1" />
+  <launchable type="desktop-id">
+    io.github.arrifat346afs.TuxScale.desktop
+  </launchable>
 
-  <launchable type="desktop-id">io.github.arrifat346afs.TuxScale.desktop</launchable>
+  <content_rating type="oars-1.1"/>
 
   <screenshots>
     <screenshot type="default">
@@ -25,10 +51,32 @@
   </screenshots>
 
   <releases>
-    <release version="1.0.0" date="2025-01-01">
+    <release version="1.2.0" date="2026-07-11">
       <description>
-        <p>Initial release</p>
+        <ul>
+          <li>Initial Flathub release.</li>
+          <li>AI-powered video upscaling.</li>
+          <li>Improved Linux integration.</li>
+          <li>Modern graphical interface.</li>
+        </ul>
       </description>
     </release>
   </releases>
+
+  <provides>
+    <binary>tuxscale</binary>
+  </provides>
+
+  <categories>
+    <category>Graphics</category>
+    <category>Video</category>
+  </categories>
+
+  <keywords>
+    <keyword>AI</keyword>
+    <keyword>Video</keyword>
+    <keyword>Upscaling</keyword>
+    <keyword>Enhance</keyword>
+    <keyword>Resolution</keyword>
+  </keywords>
 </component>
