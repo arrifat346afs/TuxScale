@@ -59,7 +59,7 @@ modules:
     sources:
       - type: git
         url: https://github.com/arrifat346afs/TuxScale
-        tag: v1.2.0
+        tag: v1.2.1
         commit: 2780cc8fc23d9998166a9e1dc908edd6f064a654
         x-checker-data:
           type: json

@@ -51,7 +51,7 @@
   </screenshots>
 
   <releases>
-    <release version="1.2.0" date="2026-07-11">
+    <release version="1.2.1" date="2026-07-11">
       <description>
         <ul>
           <li>Initial Flathub release.</li>
