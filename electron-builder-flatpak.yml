@@ -1,0 +1,34 @@
+appId: io.github.arrifat346afs.TuxScale
+productName: TuxScale
+
+directories:
+  buildResources: build
+
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+
+extraResources:
+  - from: resources/linux/bin
+    to: linux/bin
+  - from: resources/models
+    to: models
+  - from: resources/icon.png
+    to: icon.png
+  - from: resources/icons/512x512.png
+    to: 512x512.png
+  - from: resources/icons/128x128.png
+    to: 128x128.png
+
+linux:
+  icon: resources/icons/
+  target:
+    - dir
+  maintainer: TuxScale
+  category: Utility
+
+npmRebuild: false
