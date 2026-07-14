@@ -66,7 +66,10 @@ export function useUpscale(): UseUpscaleReturn {
   const [doubleUpscale, setDoubleUpscale] = useState(false)
   const [model, setModel] = useState(() => localStorage.getItem('selectedModel') || '')
   const [models, setModels] = useState<string[]>([])
-  const [scale, setScale] = useState([4])
+  const [scale, setScale] = useState(() => {
+    const saved = localStorage.getItem('videoScale')
+    return saved ? [Number(saved)] : [4]
+  })
   const [ttaMode, setTtaMode] = useState(false)
   const [tileSize, setTileSize] = useState('256')
   const [batchSize, setBatchSize] = useState(10)
@@ -96,6 +99,10 @@ export function useUpscale(): UseUpscaleReturn {
   useEffect(() => {
     localStorage.setItem('outputFormat', outputFormat)
   }, [outputFormat])
+
+  useEffect(() => {
+    localStorage.setItem('videoScale', String(scale[0]))
+  }, [scale])
 
   useEffect(() => {
     window.api.getModelsList().then((list) => {
