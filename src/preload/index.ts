@@ -3,7 +3,11 @@ import { electronAPI } from '@electron-toolkit/preload'
 import { ELECTRON_COMMANDS } from '../../common/electron-commands'
 
 const api = {
-  getModelsList: () => ipcRenderer.invoke(ELECTRON_COMMANDS.GET_MODELS_LIST),
+  getModelsList: (backend?: string) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.GET_MODELS_LIST, backend),
+
+  getEngineStatus: (payload?: { preference?: string; customPythonPath?: string }) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.GET_ENGINE_STATUS, payload),
 
   selectVideo: () => ipcRenderer.invoke(ELECTRON_COMMANDS.SELECT_FILE),
 
@@ -20,6 +24,8 @@ const api = {
     outputPath?: string
     model: string
     scale: string
+    backend?: string
+    customPythonPath?: string
     ttaMode?: boolean
     tileSize?: number
     batchSize?: number
@@ -31,6 +37,8 @@ const api = {
     outputPath?: string
     model: string
     scale: string
+    backend?: string
+    customPythonPath?: string
     ttaMode?: boolean
     tileSize?: number
     batchSize?: number

@@ -1,14 +1,43 @@
 type ImageFormat = 'png' | 'jpg' | 'jpeg' | 'webp'
 
+export type BackendPreference = 'auto' | 'ncnn' | 'pytorch'
+export type BackendId = 'ncnn' | 'pytorch'
+
+export type StatusCheckItem = {
+  ok: boolean
+  message: string
+  details?: string
+}
+
+export type EngineStatus = {
+  backend: BackendId
+  available: boolean
+  gpuName?: string
+  details: Record<string, StatusCheckItem>
+}
+
+export type AllEnginesStatus = {
+  activeBackend: BackendId
+  preference: BackendPreference
+  resolvedReason: string
+  engines: Record<BackendId, EngineStatus>
+}
+
 export type VideoUpscaylPayload = {
   videoPath: string
   outputPath?: string
   model: string
   scale: string
+  backend?: BackendPreference
+  customPythonPath?: string
   ttaMode?: boolean
   tileSize?: number
   batchSize?: number
   outputFormat?: string
+}
+
+export type FolderUpscaylPayload = Omit<VideoUpscaylPayload, 'videoPath'> & {
+  folderPath: string
 }
 
 export type SystemInfo = {
