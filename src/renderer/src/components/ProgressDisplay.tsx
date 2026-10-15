@@ -1,4 +1,7 @@
+import { useEffect, useRef } from 'react'
 import { Button } from './ui/button'
+import { Progress } from './ui/progress'
+import { ScrollArea } from './ui/scroll-area'
 import { X } from 'lucide-react'
 import type { ProgressData } from '../types'
 import { IdleDisplay } from './IdleDisplay'
@@ -34,6 +37,15 @@ export const ProgressDisplay = ({
   folderPath,
   folderVideoCount
 }: ProgressDisplayProps): React.ReactElement => {
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector('[data-slot="scroll-area-viewport"]')
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight
+    }
+  }, [logs])
+
   if (!progress && !isProcessing) {
     return (
       <IdleDisplay
@@ -71,12 +83,10 @@ export const ProgressDisplay = ({
               <span className="text-muted-foreground">{percent}%</span>
             </div>
 
-            <div className="h-3 w-full overflow-hidden rounded-full bg-secondary">
-              <div
-                className="h-full rounded-full bg-violet-600 transition-all duration-300"
-                style={{ width: `${percent}%` }}
-              />
-            </div>
+            <Progress
+              value={percent}
+              className="h-3 bg-secondary [&>[data-slot=progress-indicator]]:bg-violet-600"
+            />
 
             {progress.message && (
               <p className="text-sm text-muted-foreground">{progress.message}</p>
@@ -92,15 +102,20 @@ export const ProgressDisplay = ({
       )}
 
       {logs.length > 0 && (
-        <div className="mb-5 space-y-2">
+        <div className="mb-5 min-w-0 space-y-2">
           <h3 className="text-sm font-semibold">Logs</h3>
-          <div className="h-40 overflow-y-auto rounded-lg border bg-muted/50 p-3">
-            {logs.map((log, i) => (
-              <p key={i} className="text-xs leading-relaxed text-muted-foreground">
-                {log}
-              </p>
-            ))}
-          </div>
+          <ScrollArea ref={scrollAreaRef} className="h-40 rounded-lg border bg-muted/50">
+            <div className="p-3">
+              {logs.map((log, i) => (
+                <p
+                  key={i}
+                  className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
+                >
+                  {log}
+                </p>
+              ))}
+            </div>
+          </ScrollArea>
         </div>
       )}
 

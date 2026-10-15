@@ -11,6 +11,7 @@ import { getModel } from './getmodel'
 import { upscaleSingleVideo, stopAllProcesses, type UpscaleVideoOptions } from './upscale'
 import { upscaleFolder, cancelBatch, type UpscaleFolderOptions } from './batch'
 import { getVideoFiles } from './video-utils'
+import { getAllEnginesStatus, getEngine, type BackendPreference } from './engines'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -156,8 +157,18 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(ELECTRON_COMMANDS.UPSCAYL_VIDEO, async (event, payload) => {
-    const { videoPath, outputPath, model, scale, ttaMode, tileSize, outputFormat, batchSize } =
-      payload
+    const {
+      videoPath,
+      outputPath,
+      model,
+      scale,
+      backend,
+      customPythonPath,
+      ttaMode,
+      tileSize,
+      outputFormat,
+      batchSize
+    } = payload
     const win = BrowserWindow.fromWebContents(event.sender)
 
     const options: UpscaleVideoOptions = {
@@ -165,6 +176,8 @@ function registerIpcHandlers(): void {
       outputPath,
       model,
       scale: String(scale),
+      backend,
+      customPythonPath,
       ttaMode,
       tileSize,
       batchSize,
@@ -187,8 +200,18 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(ELECTRON_COMMANDS.FOLDER_UPSCAYL, async (event, payload) => {
-    const { folderPath, outputPath, model, scale, ttaMode, tileSize, outputFormat, batchSize } =
-      payload
+    const {
+      folderPath,
+      outputPath,
+      model,
+      scale,
+      backend,
+      customPythonPath,
+      ttaMode,
+      tileSize,
+      outputFormat,
+      batchSize
+    } = payload
     const win = BrowserWindow.fromWebContents(event.sender)
 
     const options: UpscaleFolderOptions = {
@@ -196,6 +219,8 @@ function registerIpcHandlers(): void {
       outputPath,
       model,
       scale: String(scale),
+      backend,
+      customPythonPath,
       ttaMode,
       tileSize,
       batchSize,
@@ -234,7 +259,22 @@ function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle(ELECTRON_COMMANDS.GET_MODELS_LIST, () => getModel())
+  ipcMain.handle(ELECTRON_COMMANDS.GET_MODELS_LIST, async (_, backend?: string) => {
+    if (backend === 'pytorch') {
+      return getEngine('pytorch').getModels()
+    }
+    if (backend === 'ncnn') {
+      return getEngine('ncnn').getModels()
+    }
+    // Default: ncnn models
+    return getModel()
+  })
+
+  ipcMain.handle(ELECTRON_COMMANDS.GET_ENGINE_STATUS, async (_, payload) => {
+    const preference = (payload?.preference as BackendPreference) ?? 'auto'
+    const customPythonPath: string | undefined = payload?.customPythonPath
+    return getAllEnginesStatus(preference, customPythonPath)
+  })
 
   ipcMain.handle(ELECTRON_COMMANDS.GET_SYSTEM_INFO, async () => {
     const totalRam = os.totalmem()

@@ -75,8 +75,11 @@ export async function upscaleFolder(options: UpscaleFolderOptions): Promise<stri
         outputPath: perVideoOutputPath,
         model,
         scale,
+        backend: options.backend,
+        customPythonPath: options.customPythonPath,
         ttaMode,
         tileSize,
+        batchSize: options.batchSize,
         outputFormat,
         onProgress: (data) => {
           onProgress({

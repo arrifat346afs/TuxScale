@@ -39,7 +39,8 @@ const ELECTRON_COMMANDS = {
   UPDATE_NOT_AVAILABLE: 'Update Not Available',
   UPDATE_ERROR: 'Update Error',
   UPDATE_DOWNLOAD_PROGRESS: 'Update Download Progress',
-  UPDATE_DOWNLOADED: 'Update Downloaded'
+  UPDATE_DOWNLOADED: 'Update Downloaded',
+  GET_ENGINE_STATUS: 'Get Engine Status'
 } as const
 
 export { ELECTRON_COMMANDS }
