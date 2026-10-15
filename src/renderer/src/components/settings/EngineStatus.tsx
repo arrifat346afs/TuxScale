@@ -24,7 +24,7 @@ const SETUP_COMMANDS = `python3.12 -m venv ~/.venvs/tuxscale
 source ~/.venvs/tuxscale/bin/activate
 pip install --upgrade pip setuptools wheel
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-pip install basicsr realesrgan`
+pip install basicsr realesrgan --no-build-isolation`
 
 export const EngineStatus: React.FC<EngineStatusProps> = ({ status, isLoading, onRefresh }) => {
   const [copied, setCopied] = useState(false)
@@ -202,6 +202,13 @@ export const EngineStatus: React.FC<EngineStatusProps> = ({ status, isLoading, o
                 pytorch.org
                 <ExternalLink className="size-2.5" />
               </a>
+            </p>
+            <p>
+              • If <code className="bg-muted px-1 rounded text-[10px]">python3.12</code> is not
+              installed, create it with uv:{' '}
+              <code className="bg-muted px-1 rounded text-[10px]">
+                uv venv --python 3.12 ~/.venvs/tuxscale
+              </code>
             </p>
             <p>
               • Virtualenvs at{' '}
