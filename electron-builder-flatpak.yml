@@ -23,6 +23,8 @@ extraResources:
     to: 512x512.png
   - from: resources/icons/128x128.png
     to: 128x128.png
+  - from: resources/python
+    to: python
 
 linux:
   icon: resources/icons/
