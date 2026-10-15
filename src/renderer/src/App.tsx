@@ -11,6 +11,14 @@ function App(): React.JSX.Element {
     setBatchMode,
     doubleUpscale,
     setDoubleUpscale,
+    backend,
+    setBackend,
+    customPythonPath,
+    setCustomPythonPath,
+    activeBackend,
+    engineStatus,
+    isCheckingEngineStatus,
+    refreshEngineStatus,
     model,
     setModel,
     models,
@@ -56,6 +64,14 @@ function App(): React.JSX.Element {
           onBatchModeChange={setBatchMode}
           doubleUpscale={doubleUpscale}
           onDoubleUpscaleChange={setDoubleUpscale}
+          backend={backend}
+          onBackendChange={setBackend}
+          customPythonPath={customPythonPath}
+          onCustomPythonPathChange={setCustomPythonPath}
+          activeBackend={activeBackend}
+          engineStatus={engineStatus}
+          isCheckingEngineStatus={isCheckingEngineStatus}
+          onRefreshEngineStatus={refreshEngineStatus}
           model={model}
           onModelChange={setModel}
           models={models}

@@ -27,8 +27,14 @@ import {
   FileVideo,
   Download
 } from 'lucide-react'
-import type { SystemInfo } from '../../../../common/types/types'
+import type {
+  SystemInfo,
+  BackendPreference,
+  AllEnginesStatus,
+  BackendId
+} from '../../../../common/types/types'
 import tuxscaleLogo from '../assets/tuxscale-logo.png'
+import { BackendSettings } from './settings/BackendSettings'
 
 type SidebarPanelProps = {
   activeTab: string
@@ -37,6 +43,14 @@ type SidebarPanelProps = {
   onBatchModeChange: (batch: boolean) => void
   doubleUpscale: boolean
   onDoubleUpscaleChange: (double: boolean) => void
+  backend: BackendPreference
+  onBackendChange: (backend: BackendPreference) => void
+  customPythonPath: string
+  onCustomPythonPathChange: (path: string) => void
+  activeBackend: BackendId
+  engineStatus: AllEnginesStatus | null
+  isCheckingEngineStatus: boolean
+  onRefreshEngineStatus: () => void
   model: string
   onModelChange: (model: string) => void
   models: string[]
@@ -73,6 +87,14 @@ export const SidebarPanel = ({
   onBatchModeChange,
   doubleUpscale,
   onDoubleUpscaleChange,
+  backend,
+  onBackendChange,
+  customPythonPath,
+  onCustomPythonPathChange,
+  activeBackend,
+  engineStatus,
+  isCheckingEngineStatus,
+  onRefreshEngineStatus,
   model,
   onModelChange,
   models,
@@ -172,8 +194,13 @@ export const SidebarPanel = ({
 
             <div className="space-y-4 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
               <div className="space-y-1">
-                <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Step 2
+                <div className="flex items-center justify-between">
+                  <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Step 2
+                  </div>
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted/70 text-muted-foreground uppercase">
+                    {activeBackend === 'pytorch' ? 'PyTorch' : 'NCNN'}
+                  </span>
                 </div>
                 <p className="text-xs text-muted-foreground">Select AI Model</p>
               </div>
@@ -194,18 +221,20 @@ export const SidebarPanel = ({
                 </SelectContent>
               </Select>
 
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="double-upscale"
-                  checked={doubleUpscale}
-                  onCheckedChange={onDoubleUpscaleChange}
-                  disabled={isProcessing}
-                />
-                <Label htmlFor="double-upscale" className="cursor-pointer">
-                  Double Upscale
-                </Label>
-                <HelpCircle className="size-4 text-muted-foreground" />
-              </div>
+              {activeBackend === 'ncnn' ? (
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="double-upscale"
+                    checked={doubleUpscale}
+                    onCheckedChange={onDoubleUpscaleChange}
+                    disabled={isProcessing}
+                  />
+                  <Label htmlFor="double-upscale" className="cursor-pointer">
+                    Double Upscale
+                  </Label>
+                  <HelpCircle className="size-4 text-muted-foreground" />
+                </div>
+              ) : null}
 
               <div className="rounded border border-border/50  p-2">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -221,6 +250,11 @@ export const SidebarPanel = ({
                   step={1}
                   disabled={isProcessing}
                 />
+                {activeBackend === 'pytorch' && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Note: PyTorch runs at 4x and resizes if 2x is selected.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -261,6 +295,18 @@ export const SidebarPanel = ({
           </>
         ) : (
           <div className="flex flex-1 flex-col gap-5 overflow-auto">
+            <BackendSettings
+              backend={backend}
+              onBackendChange={onBackendChange}
+              customPythonPath={customPythonPath}
+              onCustomPythonPathChange={onCustomPythonPathChange}
+              engineStatus={engineStatus}
+              isCheckingStatus={isCheckingEngineStatus}
+              onRefreshStatus={onRefreshEngineStatus}
+            />
+
+            <Separator />
+
             <div className="space-y-3">
               <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
                 Export Settings
@@ -295,34 +341,52 @@ export const SidebarPanel = ({
                   outputFormat === 'mkv' ||
                   outputFormat === 'avi' ||
                   outputFormat === 'mov'
-                    ? 'Upscaled video will use this container and codec.'
+                    ? activeBackend === 'pytorch' && outputFormat !== 'mp4'
+                      ? `Upscaled via PyTorch MP4 and converted to ${outputFormat.toUpperCase()} with FFmpeg.`
+                      : 'Upscaled video will use this container and codec.'
                     : 'Audio will be extracted from the source video.'}
                 </p>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                Memory
-              </h3>
-              <div className="space-y-2">
-                <Label className="text-xs">Frames per batch</Label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={batchSize}
-                    onChange={(e) => onBatchSizeChange(Math.max(1, parseInt(e.target.value) || 1))}
-                    disabled={isProcessing}
-                    className="w-20 h-10 rounded-2xl border border-input/60 bg-background/90 px-3 text-sm text-center transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Lower = less memory, higher = faster
-                  </p>
+            {activeBackend === 'ncnn' && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  Memory
+                </h3>
+                <div className="space-y-2">
+                  <Label className="text-xs">Frames per batch</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={batchSize}
+                      onChange={(e) =>
+                        onBatchSizeChange(Math.max(1, parseInt(e.target.value) || 1))
+                      }
+                      disabled={isProcessing}
+                      className="w-20 h-10 rounded-2xl border border-input/60 bg-background/90 px-3 text-sm text-center transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Lower = less memory, higher = faster
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {activeBackend === 'pytorch' && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  Memory
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Streaming active: PyTorch streams frames directly between decoder and encoder
+                  pipes without temporary files, maintaining flat RAM.
+                </p>
+              </div>
+            )}
 
             <div className="flex-1" />
 

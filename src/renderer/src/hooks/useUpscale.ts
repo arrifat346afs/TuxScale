@@ -1,6 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import type { ProgressData } from '../types'
-import type { SystemInfo } from '../../../../common/types/types'
+import type {
+  SystemInfo,
+  BackendPreference,
+  AllEnginesStatus,
+  BackendId
+} from '../../../../common/types/types'
 
 type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error'
 
@@ -25,6 +30,14 @@ type UseUpscaleReturn = {
   setBatchMode: (batch: boolean) => void
   doubleUpscale: boolean
   setDoubleUpscale: (double: boolean) => void
+  backend: BackendPreference
+  setBackend: (backend: BackendPreference) => void
+  customPythonPath: string
+  setCustomPythonPath: (path: string) => void
+  activeBackend: BackendId
+  engineStatus: AllEnginesStatus | null
+  isCheckingEngineStatus: boolean
+  refreshEngineStatus: () => Promise<void>
   model: string
   setModel: (model: string) => void
   models: string[]
@@ -64,6 +77,16 @@ export function useUpscale(): UseUpscaleReturn {
   const [activeTab, setActiveTab] = useState('upscale')
   const [batchMode, setBatchMode] = useState(false)
   const [doubleUpscale, setDoubleUpscale] = useState(false)
+
+  const [backend, setBackend] = useState<BackendPreference>(
+    () => (localStorage.getItem('backendPreference') as BackendPreference) || 'auto'
+  )
+  const [customPythonPath, setCustomPythonPath] = useState(
+    () => localStorage.getItem('customPythonPath') || ''
+  )
+  const [engineStatus, setEngineStatus] = useState<AllEnginesStatus | null>(null)
+  const [isCheckingEngineStatus, setIsCheckingEngineStatus] = useState(false)
+
   const [model, setModel] = useState(() => localStorage.getItem('selectedModel') || '')
   const [models, setModels] = useState<string[]>([])
   const [scale, setScale] = useState(() => {
@@ -90,11 +113,22 @@ export function useUpscale(): UseUpscaleReturn {
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo>({})
   const batchModeRef = useRef(batchMode)
 
+  const activeBackend: BackendId =
+    engineStatus?.activeBackend || (backend === 'pytorch' ? 'pytorch' : 'ncnn')
+
   const handleBatchModeChange = useCallback((batch: boolean) => {
     batchModeRef.current = batch
     setBatchMode(batch)
     setUpscaledVideoPath(null)
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem('backendPreference', backend)
+  }, [backend])
+
+  useEffect(() => {
+    localStorage.setItem('customPythonPath', customPythonPath)
+  }, [customPythonPath])
 
   useEffect(() => {
     localStorage.setItem('outputFormat', outputFormat)
@@ -104,16 +138,48 @@ export function useUpscale(): UseUpscaleReturn {
     localStorage.setItem('videoScale', String(scale[0]))
   }, [scale])
 
+  const refreshEngineStatus = useCallback(async () => {
+    setIsCheckingEngineStatus(true)
+    try {
+      const status = await window.api.getEngineStatus({
+        preference: backend,
+        customPythonPath: customPythonPath || undefined
+      })
+      setEngineStatus(status)
+    } catch (err) {
+      console.error('Failed to get engine status', err)
+    } finally {
+      setIsCheckingEngineStatus(false)
+    }
+  }, [backend, customPythonPath])
+
   useEffect(() => {
-    window.api.getModelsList().then((list) => {
+    window.api
+      .getEngineStatus({
+        preference: backend,
+        customPythonPath: customPythonPath || undefined
+      })
+      .then(setEngineStatus)
+      .catch((err) => console.error('Failed to get engine status', err))
+  }, [backend, customPythonPath])
+
+  useEffect(() => {
+    const targetBackend =
+      engineStatus?.activeBackend || (backend === 'pytorch' ? 'pytorch' : 'ncnn')
+    window.api.getModelsList(targetBackend).then((list) => {
       setModels(list)
       if (list.length > 0) {
         const savedModel = localStorage.getItem('selectedModel')
         if (!savedModel || !list.includes(savedModel)) {
           setModel(list[0])
+        } else {
+          setModel(savedModel)
         }
       }
     })
+  }, [backend, engineStatus?.activeBackend])
+
+  useEffect(() => {
     window.api
       .getSystemInfo()
       .then(setSystemInfo)
@@ -258,6 +324,8 @@ export function useUpscale(): UseUpscaleReturn {
         outputPath: outputPath || undefined,
         model,
         scale: String(scale[0]),
+        backend,
+        customPythonPath: customPythonPath || undefined,
         ttaMode,
         tileSize: parseInt(tileSize) || 0,
         batchSize,
@@ -271,6 +339,8 @@ export function useUpscale(): UseUpscaleReturn {
       outputPath: outputPath || undefined,
       model,
       scale: String(scale[0]),
+      backend,
+      customPythonPath: customPythonPath || undefined,
       ttaMode,
       tileSize: parseInt(tileSize) || 0,
       batchSize,
@@ -282,6 +352,8 @@ export function useUpscale(): UseUpscaleReturn {
     videoPath,
     model,
     scale,
+    backend,
+    customPythonPath,
     outputPath,
     ttaMode,
     tileSize,
@@ -313,6 +385,14 @@ export function useUpscale(): UseUpscaleReturn {
     setBatchMode: handleBatchModeChange,
     doubleUpscale,
     setDoubleUpscale,
+    backend,
+    setBackend,
+    customPythonPath,
+    setCustomPythonPath,
+    activeBackend,
+    engineStatus,
+    isCheckingEngineStatus,
+    refreshEngineStatus,
     model,
     setModel,
     models,
