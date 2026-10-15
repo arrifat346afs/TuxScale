@@ -81,6 +81,9 @@ export async function upscaleFolder(options: UpscaleFolderOptions): Promise<stri
         tileSize,
         batchSize: options.batchSize,
         outputFormat,
+        pytorchLowVram: options.pytorchLowVram,
+        pytorchEncoder: options.pytorchEncoder,
+        pytorchSkipDuplicates: options.pytorchSkipDuplicates,
         onProgress: (data) => {
           onProgress({
             ...data,

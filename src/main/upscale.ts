@@ -18,6 +18,9 @@ export type UpscaleVideoOptions = {
   tileSize?: number
   batchSize?: number
   outputFormat?: string
+  pytorchLowVram?: boolean
+  pytorchEncoder?: 'auto' | 'nvenc' | 'cpu'
+  pytorchSkipDuplicates?: boolean
   onProgress: (data: ProgressData) => void
   sendLog: (message: string) => void
 }

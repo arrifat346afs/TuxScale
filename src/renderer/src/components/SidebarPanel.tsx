@@ -32,7 +32,8 @@ import type {
   SystemInfo,
   BackendPreference,
   AllEnginesStatus,
-  BackendId
+  BackendId,
+  PyTorchEncoderMode
 } from '../../../../common/types/types'
 import tuxscaleLogo from '../assets/tuxscale-logo.png'
 import { BackendSettings } from './settings/BackendSettings'
@@ -61,6 +62,12 @@ type SidebarPanelProps = {
   onTtaModeChange: (tta: boolean) => void
   tileSize: string
   onTileSizeChange: (tileSize: string) => void
+  pytorchLowVram?: boolean
+  onPytorchLowVramChange?: (lowVram: boolean) => void
+  pytorchEncoder?: PyTorchEncoderMode
+  onPytorchEncoderChange?: (encoder: PyTorchEncoderMode) => void
+  pytorchSkipDuplicates?: boolean
+  onPytorchSkipDuplicatesChange?: (skipDuplicates: boolean) => void
   batchSize: number
   onBatchSizeChange: (size: number) => void
   outputFormat: string
@@ -105,6 +112,12 @@ export const SidebarPanel = ({
   // onTtaModeChange,
   // tileSize,
   // onTileSizeChange,
+  pytorchLowVram,
+  onPytorchLowVramChange,
+  pytorchEncoder,
+  onPytorchEncoderChange,
+  pytorchSkipDuplicates,
+  onPytorchSkipDuplicatesChange,
   batchSize,
   onBatchSizeChange,
   outputFormat,
@@ -310,6 +323,12 @@ export const SidebarPanel = ({
                 engineStatus={engineStatus}
                 isCheckingStatus={isCheckingEngineStatus}
                 onRefreshStatus={onRefreshEngineStatus}
+                pytorchLowVram={pytorchLowVram}
+                onPytorchLowVramChange={onPytorchLowVramChange}
+                pytorchEncoder={pytorchEncoder}
+                onPytorchEncoderChange={onPytorchEncoderChange}
+                pytorchSkipDuplicates={pytorchSkipDuplicates}
+                onPytorchSkipDuplicatesChange={onPytorchSkipDuplicatesChange}
               />
 
               <Separator />
