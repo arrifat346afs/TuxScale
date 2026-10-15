@@ -221,7 +221,7 @@ export const SidebarPanel = ({
                 </div>
 
                 <Select value={model} onValueChange={onModelChange} disabled={isProcessing}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <div className="flex items-center gap-2">
                       <Layers className="size-4 text-primary" />
                       <SelectValue placeholder="Select a model" />
@@ -331,16 +331,19 @@ export const SidebarPanel = ({
                 onPytorchSkipDuplicatesChange={onPytorchSkipDuplicatesChange}
               />
 
-              <Separator />
+              {/* Export Settings Card */}
+              <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <FileVideo className="size-4 text-primary" />
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Export Settings
+                  </h3>
+                </div>
 
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                  Export Settings
-                </h3>
-                <div className="space-y-2">
-                  <Label className="text-xs">Export Format</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Export Format</Label>
                   <Select value={outputFormat} onValueChange={onOutputFormatChange}>
-                    <SelectTrigger className="w-full rounded-full">
+                    <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -361,27 +364,30 @@ export const SidebarPanel = ({
                       </SelectGroup>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground truncate">
                     {outputFormat === 'mp4' ||
                     outputFormat === 'webm' ||
                     outputFormat === 'mkv' ||
                     outputFormat === 'avi' ||
                     outputFormat === 'mov'
                       ? activeBackend === 'pytorch' && outputFormat !== 'mp4'
-                        ? `Upscaled via PyTorch MP4 and converted to ${outputFormat.toUpperCase()} with FFmpeg.`
-                        : 'Upscaled video will use this container and codec.'
-                      : 'Audio will be extracted from the source video.'}
+                        ? `PyTorch streams MP4 and remuxes to ${outputFormat.toUpperCase()}.`
+                        : `Upscaled video will use ${outputFormat.toUpperCase()} container.`
+                      : 'Audio stream extracted from source video.'}
                   </p>
                 </div>
               </div>
 
               {activeBackend === 'ncnn' && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                    Memory
-                  </h3>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Frames per batch</Label>
+                <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3 shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <Layers className="size-4 text-primary" />
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      NCNN Batching
+                    </h3>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Frames per batch</Label>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -392,25 +398,13 @@ export const SidebarPanel = ({
                           onBatchSizeChange(Math.max(1, parseInt(e.target.value) || 1))
                         }
                         disabled={isProcessing}
-                        className="w-20 h-10 rounded-2xl border border-input/60 bg-background/90 px-3 text-sm text-center transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-20 h-9 rounded-xl border border-input/60 bg-background/90 px-3 text-xs text-center transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Lower = less memory, higher = faster
+                      <p className="text-[11px] text-muted-foreground">
+                        Lower = less RAM, higher = faster
                       </p>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {activeBackend === 'pytorch' && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                    Memory
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Streaming active: PyTorch streams frames directly between decoder and encoder
-                    pipes without temporary files, maintaining flat RAM.
-                  </p>
                 </div>
               )}
 
