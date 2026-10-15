@@ -4,6 +4,7 @@ import { Switch } from './ui/switch'
 import { Slider } from './ui/slider'
 import { Separator } from './ui/separator'
 import { Tabs, TabsList, TabsTrigger } from './ui/tabs'
+import { ScrollArea } from './ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -148,388 +149,397 @@ export const SidebarPanel = ({
         </Tabs>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5 space-y-6">
-        {activeTab === 'upscale' ? (
-          <>
-            <div className="flex items-center gap-2">
-              <Switch id="batch-mode" checked={batchMode} onCheckedChange={onBatchModeChange} />
-              <Label htmlFor="batch-mode" className="cursor-pointer">
-                Batch Upscale
-              </Label>
-            </div>
-
-            <div className="space-y-3 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
-              <div className="inline-flex items-center   bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Step 1
+      <ScrollArea className="min-h-0 flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block [&>[data-slot=scroll-area-viewport]>div]:!block">
+        <div className="space-y-6 p-5">
+          {activeTab === 'upscale' ? (
+            <>
+              <div className="flex items-center gap-2">
+                <Switch id="batch-mode" checked={batchMode} onCheckedChange={onBatchModeChange} />
+                <Label htmlFor="batch-mode" className="cursor-pointer">
+                  Batch Upscale
+                </Label>
               </div>
-              {batchMode ? (
-                <Button
-                  variant="secondary"
-                  className="w-full rounded-full"
-                  onClick={onSelectFolder}
-                  disabled={isProcessing}
-                >
-                  <FolderOpen />
-                  Select Folder
-                </Button>
-              ) : (
-                <Button
-                  variant="secondary"
-                  className="w-full rounded-full"
-                  onClick={onSelectVideo}
-                  disabled={isProcessing}
-                >
-                  <FileVideo />
-                  Select Video
-                </Button>
-              )}
 
-              {!batchMode && videoName && (
-                <p className="truncate text-xs text-muted-foreground">{videoName}</p>
-              )}
-              {batchMode && folderPath && (
-                <p className="truncate text-xs text-muted-foreground">{folderPath}</p>
-              )}
-            </div>
-
-            <div className="space-y-4 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Step 2
-                  </div>
-                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted/70 text-muted-foreground uppercase">
-                    {activeBackend === 'pytorch' ? 'PyTorch' : 'NCNN'}
-                  </span>
+              <div className="space-y-3 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+                <div className="inline-flex items-center   bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Step 1
                 </div>
-                <p className="text-xs text-muted-foreground">Select AI Model</p>
-              </div>
-
-              <Select value={model} onValueChange={onModelChange} disabled={isProcessing}>
-                <SelectTrigger>
-                  <div className="flex items-center gap-2">
-                    <Layers className="size-4 text-primary" />
-                    <SelectValue placeholder="Select a model" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {models.map((modelName) => (
-                    <SelectItem key={modelName} value={modelName}>
-                      {modelName.replace(/-/g, ' ').toUpperCase()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {activeBackend === 'ncnn' ? (
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="double-upscale"
-                    checked={doubleUpscale}
-                    onCheckedChange={onDoubleUpscaleChange}
-                    disabled={isProcessing}
-                  />
-                  <Label htmlFor="double-upscale" className="cursor-pointer">
-                    Double Upscale
-                  </Label>
-                  <HelpCircle className="size-4 text-muted-foreground" />
-                </div>
-              ) : null}
-
-              <div className="rounded border border-border/50  p-2">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Video Scale</span>
-                  <span className="font-semibold text-foreground">{scale[0]}x</span>
-                </div>
-                <Slider
-                  className="h-12"
-                  value={scale}
-                  onValueChange={onScaleChange}
-                  min={1}
-                  max={4}
-                  step={1}
-                  disabled={isProcessing}
-                />
-                {activeBackend === 'pytorch' && (
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Note: PyTorch runs at 4x and resizes if 2x is selected.
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-3 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
-              <div className="space-y-1">
-                <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Step 3
-                </div>
-                <p className="text-xs text-muted-foreground">Defaults to Video&apos;s path</p>
-              </div>
-              <Button
-                variant="secondary"
-                className="w-full rounded-full"
-                onClick={onSelectOutputFolder}
-                disabled={isProcessing}
-              >
-                <Folder />
-                Set Output Folder
-              </Button>
-              {outputPath && <p className="truncate text-xs text-muted-foreground">{outputPath}</p>}
-            </div>
-
-            <div className="space-y-3 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
-              <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Step 4
-              </div>
-              <Button
-                className="w-full rounded-full transition duration-200 hover:-translate-y-0.5"
-                onClick={onUpscale}
-                disabled={
-                  isProcessing || (!batchMode && !videoPath) || (batchMode && !folderPath) || !model
-                }
-              >
-                <Rocket />
-                Upscale
-              </Button>
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-1 flex-col gap-5 overflow-auto">
-            <BackendSettings
-              backend={backend}
-              onBackendChange={onBackendChange}
-              customPythonPath={customPythonPath}
-              onCustomPythonPathChange={onCustomPythonPathChange}
-              engineStatus={engineStatus}
-              isCheckingStatus={isCheckingEngineStatus}
-              onRefreshStatus={onRefreshEngineStatus}
-            />
-
-            <Separator />
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                Export Settings
-              </h3>
-              <div className="space-y-2">
-                <Label className="text-xs">Export Format</Label>
-                <Select value={outputFormat} onValueChange={onOutputFormatChange}>
-                  <SelectTrigger className="w-full rounded-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Video Formats</SelectLabel>
-                      <SelectItem value="mp4">MP4 (H.264)</SelectItem>
-                      <SelectItem value="webm">WebM (VP9)</SelectItem>
-                      <SelectItem value="mkv">MKV (H.264)</SelectItem>
-                      <SelectItem value="avi">AVI</SelectItem>
-                      <SelectItem value="mov">MOV (H.264)</SelectItem>
-                    </SelectGroup>
-                    <SelectGroup>
-                      <SelectLabel>Audio Formats</SelectLabel>
-                      <SelectItem value="mp3">MP3</SelectItem>
-                      <SelectItem value="wav">WAV</SelectItem>
-                      <SelectItem value="aac">AAC</SelectItem>
-                      <SelectItem value="flac">FLAC</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {outputFormat === 'mp4' ||
-                  outputFormat === 'webm' ||
-                  outputFormat === 'mkv' ||
-                  outputFormat === 'avi' ||
-                  outputFormat === 'mov'
-                    ? activeBackend === 'pytorch' && outputFormat !== 'mp4'
-                      ? `Upscaled via PyTorch MP4 and converted to ${outputFormat.toUpperCase()} with FFmpeg.`
-                      : 'Upscaled video will use this container and codec.'
-                    : 'Audio will be extracted from the source video.'}
-                </p>
-              </div>
-            </div>
-
-            {activeBackend === 'ncnn' && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                  Memory
-                </h3>
-                <div className="space-y-2">
-                  <Label className="text-xs">Frames per batch</Label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={batchSize}
-                      onChange={(e) =>
-                        onBatchSizeChange(Math.max(1, parseInt(e.target.value) || 1))
-                      }
-                      disabled={isProcessing}
-                      className="w-20 h-10 rounded-2xl border border-input/60 bg-background/90 px-3 text-sm text-center transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Lower = less memory, higher = faster
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeBackend === 'pytorch' && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                  Memory
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Streaming active: PyTorch streams frames directly between decoder and encoder
-                  pipes without temporary files, maintaining flat RAM.
-                </p>
-              </div>
-            )}
-
-            <div className="flex-1" />
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                Updates
-              </h3>
-              <div className="rounded-xl border bg-card p-3 text-sm space-y-2">
-                <p className="text-xs text-muted-foreground">Current version: v{__APP_VERSION__}</p>
-                {updateState === 'idle' && (
+                {batchMode ? (
                   <Button
                     variant="secondary"
                     className="w-full rounded-full"
-                    onClick={onCheckForUpdates}
+                    onClick={onSelectFolder}
+                    disabled={isProcessing}
                   >
-                    <Download />
-                    Check for Updates
+                    <FolderOpen />
+                    Select Folder
+                  </Button>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    className="w-full rounded-full"
+                    onClick={onSelectVideo}
+                    disabled={isProcessing}
+                  >
+                    <FileVideo />
+                    Select Video
                   </Button>
                 )}
-                {updateState === 'checking' && (
-                  <Button variant="secondary" className="w-full rounded-full" disabled>
-                    Checking for updates...
-                  </Button>
+
+                {!batchMode && videoName && (
+                  <p className="truncate text-xs text-muted-foreground">{videoName}</p>
                 )}
-                {updateState === 'available' && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-emerald-500">
-                      Update v{updateInfo.version} available — downloading...
-                    </p>
+                {batchMode && folderPath && (
+                  <p className="truncate text-xs text-muted-foreground">{folderPath}</p>
+                )}
+              </div>
+
+              <div className="space-y-4 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Step 2
+                    </div>
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted/70 text-muted-foreground uppercase">
+                      {activeBackend === 'pytorch' ? 'PyTorch' : 'NCNN'}
+                    </span>
                   </div>
-                )}
-                {updateState === 'downloading' && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-emerald-500">
-                      Downloading... {updateInfo.percent?.toFixed(1)}%
+                  <p className="text-xs text-muted-foreground">Select AI Model</p>
+                </div>
+
+                <Select value={model} onValueChange={onModelChange} disabled={isProcessing}>
+                  <SelectTrigger>
+                    <div className="flex items-center gap-2">
+                      <Layers className="size-4 text-primary" />
+                      <SelectValue placeholder="Select a model" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {models.map((modelName) => (
+                      <SelectItem key={modelName} value={modelName}>
+                        {modelName.replace(/-/g, ' ').toUpperCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {activeBackend === 'ncnn' ? (
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="double-upscale"
+                      checked={doubleUpscale}
+                      onCheckedChange={onDoubleUpscaleChange}
+                      disabled={isProcessing}
+                    />
+                    <Label htmlFor="double-upscale" className="cursor-pointer">
+                      Double Upscale
+                    </Label>
+                    <HelpCircle className="size-4 text-muted-foreground" />
+                  </div>
+                ) : null}
+
+                <div className="rounded border border-border/50  p-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Video Scale</span>
+                    <span className="font-semibold text-foreground">{scale[0]}x</span>
+                  </div>
+                  <Slider
+                    className="h-12"
+                    value={scale}
+                    onValueChange={onScaleChange}
+                    min={1}
+                    max={4}
+                    step={1}
+                    disabled={isProcessing}
+                  />
+                  {activeBackend === 'pytorch' && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Note: PyTorch runs at 4x and resizes if 2x is selected.
                     </p>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary transition-all duration-300"
-                        style={{ width: `${updateInfo.percent ?? 0}%` }}
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+                <div className="space-y-1">
+                  <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Step 3
+                  </div>
+                  <p className="text-xs text-muted-foreground">Defaults to Video&apos;s path</p>
+                </div>
+                <Button
+                  variant="secondary"
+                  className="w-full rounded-full"
+                  onClick={onSelectOutputFolder}
+                  disabled={isProcessing}
+                >
+                  <Folder />
+                  Set Output Folder
+                </Button>
+                {outputPath && (
+                  <p className="truncate text-xs text-muted-foreground">{outputPath}</p>
+                )}
+              </div>
+
+              <div className="space-y-3 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
+                <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Step 4
+                </div>
+                <Button
+                  className="w-full rounded-full transition duration-200 hover:-translate-y-0.5"
+                  onClick={onUpscale}
+                  disabled={
+                    isProcessing ||
+                    (!batchMode && !videoPath) ||
+                    (batchMode && !folderPath) ||
+                    !model
+                  }
+                >
+                  <Rocket />
+                  Upscale
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col gap-5">
+              <BackendSettings
+                backend={backend}
+                onBackendChange={onBackendChange}
+                customPythonPath={customPythonPath}
+                onCustomPythonPathChange={onCustomPythonPathChange}
+                engineStatus={engineStatus}
+                isCheckingStatus={isCheckingEngineStatus}
+                onRefreshStatus={onRefreshEngineStatus}
+              />
+
+              <Separator />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  Export Settings
+                </h3>
+                <div className="space-y-2">
+                  <Label className="text-xs">Export Format</Label>
+                  <Select value={outputFormat} onValueChange={onOutputFormatChange}>
+                    <SelectTrigger className="w-full rounded-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Video Formats</SelectLabel>
+                        <SelectItem value="mp4">MP4 (H.264)</SelectItem>
+                        <SelectItem value="webm">WebM (VP9)</SelectItem>
+                        <SelectItem value="mkv">MKV (H.264)</SelectItem>
+                        <SelectItem value="avi">AVI</SelectItem>
+                        <SelectItem value="mov">MOV (H.264)</SelectItem>
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Audio Formats</SelectLabel>
+                        <SelectItem value="mp3">MP3</SelectItem>
+                        <SelectItem value="wav">WAV</SelectItem>
+                        <SelectItem value="aac">AAC</SelectItem>
+                        <SelectItem value="flac">FLAC</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {outputFormat === 'mp4' ||
+                    outputFormat === 'webm' ||
+                    outputFormat === 'mkv' ||
+                    outputFormat === 'avi' ||
+                    outputFormat === 'mov'
+                      ? activeBackend === 'pytorch' && outputFormat !== 'mp4'
+                        ? `Upscaled via PyTorch MP4 and converted to ${outputFormat.toUpperCase()} with FFmpeg.`
+                        : 'Upscaled video will use this container and codec.'
+                      : 'Audio will be extracted from the source video.'}
+                  </p>
+                </div>
+              </div>
+
+              {activeBackend === 'ncnn' && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                    Memory
+                  </h3>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Frames per batch</Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={batchSize}
+                        onChange={(e) =>
+                          onBatchSizeChange(Math.max(1, parseInt(e.target.value) || 1))
+                        }
+                        disabled={isProcessing}
+                        className="w-20 h-10 rounded-2xl border border-input/60 bg-background/90 px-3 text-sm text-center transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Lower = less memory, higher = faster
+                      </p>
                     </div>
                   </div>
-                )}
-                {updateState === 'downloaded' && (
-                  <Button className="w-full rounded-full" onClick={onInstallUpdate}>
-                    <Download />
-                    Restart & Install v{updateInfo.version}
-                  </Button>
-                )}
-                {updateState === 'error' && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-red-500">{updateInfo.error}</p>
+                </div>
+              )}
+
+              {activeBackend === 'pytorch' && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                    Memory
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Streaming active: PyTorch streams frames directly between decoder and encoder
+                    pipes without temporary files, maintaining flat RAM.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex-1" />
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  Updates
+                </h3>
+                <div className="rounded-xl border bg-card p-3 text-sm space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Current version: v{__APP_VERSION__}
+                  </p>
+                  {updateState === 'idle' && (
                     <Button
                       variant="secondary"
                       className="w-full rounded-full"
                       onClick={onCheckForUpdates}
                     >
                       <Download />
-                      Retry
+                      Check for Updates
                     </Button>
+                  )}
+                  {updateState === 'checking' && (
+                    <Button variant="secondary" className="w-full rounded-full" disabled>
+                      Checking for updates...
+                    </Button>
+                  )}
+                  {updateState === 'available' && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-emerald-500">
+                        Update v{updateInfo.version} available — downloading...
+                      </p>
+                    </div>
+                  )}
+                  {updateState === 'downloading' && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-emerald-500">
+                        Downloading... {updateInfo.percent?.toFixed(1)}%
+                      </p>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all duration-300"
+                          style={{ width: `${updateInfo.percent ?? 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {updateState === 'downloaded' && (
+                    <Button className="w-full rounded-full" onClick={onInstallUpdate}>
+                      <Download />
+                      Restart & Install v{updateInfo.version}
+                    </Button>
+                  )}
+                  {updateState === 'error' && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-red-500">{updateInfo.error}</p>
+                      <Button
+                        variant="secondary"
+                        className="w-full rounded-full"
+                        onClick={onCheckForUpdates}
+                      >
+                        <Download />
+                        Retry
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  System Information
+                </h3>
+
+                {systemInfo ? (
+                  <div className="space-y-2 rounded-xl border bg-card p-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Monitor className="size-4 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground">OS</span>
+                      <span className="ml-auto font-medium">
+                        {systemInfo.os.platform} {systemInfo.os.arch}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center gap-2">
+                      <Cpu className="size-4 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground">CPU</span>
+                      <span className="ml-auto font-medium truncate max-w-45">
+                        {systemInfo.cpu.model} ({systemInfo.cpu.cores})
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center gap-2">
+                      <HardDrive className="size-4 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground">RAM</span>
+                      <span className="ml-auto font-medium">
+                        {systemInfo.ram.total} / {systemInfo.ram.free} free
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-start gap-2">
+                      {systemInfo.gpu.available ? (
+                        <CheckCircle2 className="size-4 text-emerald-500 shrink-0 mt-0.5" />
+                      ) : (
+                        <XCircle className="size-4 text-red-500 shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-muted-foreground">GPU</span>
+                          <span className="font-medium text-right">
+                            {systemInfo.gpu.available ? 'Available' : 'Not Detected'}
+                          </span>
+                        </div>
+                        {systemInfo.gpu.name && (
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">
+                            {systemInfo.gpu.name}
+                          </p>
+                        )}
+                        {systemInfo.gpu.available && (
+                          <div className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                            {systemInfo.gpu.vram && <p>VRAM: {systemInfo.gpu.vram}</p>}
+                            {systemInfo.gpu.driverVersion && (
+                              <p>Driver: {systemInfo.gpu.driverVersion}</p>
+                            )}
+                            {systemInfo.gpu.cudaCores && (
+                              <p>CUDA Cores: {systemInfo.gpu.cudaCores}</p>
+                            )}
+                          </div>
+                        )}
+                        {systemInfo.gpu.available && (
+                          <p className="mt-1.5 text-xs font-medium text-emerald-500">
+                            GPU acceleration available
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border bg-card p-4 text-center text-xs text-muted-foreground">
+                    Loading system information...
                   </div>
                 )}
               </div>
             </div>
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                System Information
-              </h3>
-
-              {systemInfo ? (
-                <div className="space-y-2 rounded-xl border bg-card p-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Monitor className="size-4 text-muted-foreground shrink-0" />
-                    <span className="text-muted-foreground">OS</span>
-                    <span className="ml-auto font-medium">
-                      {systemInfo.os.platform} {systemInfo.os.arch}
-                    </span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center gap-2">
-                    <Cpu className="size-4 text-muted-foreground shrink-0" />
-                    <span className="text-muted-foreground">CPU</span>
-                    <span className="ml-auto font-medium truncate max-w-45">
-                      {systemInfo.cpu.model} ({systemInfo.cpu.cores})
-                    </span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center gap-2">
-                    <HardDrive className="size-4 text-muted-foreground shrink-0" />
-                    <span className="text-muted-foreground">RAM</span>
-                    <span className="ml-auto font-medium">
-                      {systemInfo.ram.total} / {systemInfo.ram.free} free
-                    </span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-start gap-2">
-                    {systemInfo.gpu.available ? (
-                      <CheckCircle2 className="size-4 text-emerald-500 shrink-0 mt-0.5" />
-                    ) : (
-                      <XCircle className="size-4 text-red-500 shrink-0 mt-0.5" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-muted-foreground">GPU</span>
-                        <span className="font-medium text-right">
-                          {systemInfo.gpu.available ? 'Available' : 'Not Detected'}
-                        </span>
-                      </div>
-                      {systemInfo.gpu.name && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          {systemInfo.gpu.name}
-                        </p>
-                      )}
-                      {systemInfo.gpu.available && (
-                        <div className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
-                          {systemInfo.gpu.vram && <p>VRAM: {systemInfo.gpu.vram}</p>}
-                          {systemInfo.gpu.driverVersion && (
-                            <p>Driver: {systemInfo.gpu.driverVersion}</p>
-                          )}
-                          {systemInfo.gpu.cudaCores && (
-                            <p>CUDA Cores: {systemInfo.gpu.cudaCores}</p>
-                          )}
-                        </div>
-                      )}
-                      {systemInfo.gpu.available && (
-                        <p className="mt-1.5 text-xs font-medium text-emerald-500">
-                          GPU acceleration available
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-xl border bg-card p-4 text-center text-xs text-muted-foreground">
-                  Loading system information...
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   )
 }

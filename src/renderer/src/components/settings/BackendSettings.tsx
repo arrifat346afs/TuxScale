@@ -3,6 +3,7 @@ import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Badge } from '../ui/badge'
 import { EngineStatus } from './EngineStatus'
 import type { BackendPreference, AllEnginesStatus } from '../../../../../common/types/types'
 
@@ -72,7 +73,10 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
           <Input
             value={tempPythonPath}
             onChange={(e) => setTempPythonPath(e.target.value)}
-            placeholder="e.g. /home/user/.venvs/ai/bin/python3"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleApplyPythonPath()
+            }}
+            placeholder="e.g. ~/.venvs/tuxscale/bin/python"
             className="text-xs rounded-full h-9 bg-background/80"
           />
           {isDirty && (
@@ -87,10 +91,34 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Leave blank to use system{' '}
-          <code className="text-[10px] bg-muted px-1 py-0.5 rounded">python3</code>. Specify if your
-          PyTorch environment is in a virtualenv or Conda.
+          Leave blank to auto-detect{' '}
+          <code className="text-[10px] bg-muted px-1 py-0.5 rounded">~/.venvs/tuxscale</code> or
+          system <code className="text-[10px] bg-muted px-1 py-0.5 rounded">python3</code>.
         </p>
+        {engineStatus?.detectedPython && (
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-0.5">
+            <span className="font-medium text-foreground">Active:</span>
+            <span className="truncate font-mono text-[10px]">
+              {engineStatus.detectedPython.command}
+            </span>
+            {engineStatus.detectedPython.source === 'auto-venv' && (
+              <Badge
+                variant="outline"
+                className="text-[9px] py-0 px-1.5 text-emerald-500 border-emerald-500/30"
+              >
+                Auto-Venv
+              </Badge>
+            )}
+            {engineStatus.detectedPython.source === 'custom' && (
+              <Badge
+                variant="outline"
+                className="text-[9px] py-0 px-1.5 text-primary border-primary/30"
+              >
+                Custom
+              </Badge>
+            )}
+          </div>
+        )}
       </div>
 
       <EngineStatus

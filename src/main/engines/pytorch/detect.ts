@@ -2,11 +2,17 @@ import { execFile } from 'child_process'
 import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import os from 'os'
 import type { StatusCheckItem } from '../types'
 
 export type PyTorchDetection = {
   available: boolean
   gpuName?: string
+  pythonInfo: {
+    command: string
+    version?: string
+    source: 'custom' | 'auto-venv' | 'system'
+  }
   details: {
     nvidia: StatusCheckItem
     python: StatusCheckItem
@@ -23,11 +29,52 @@ export function getScriptPath(): string {
     : path.join(process.cwd(), 'resources', 'python', 'tuxscale_upscale.py')
 }
 
-export function resolvePythonCommand(customPath?: string): string {
-  if (customPath && customPath.trim().length > 0) {
-    return customPath.trim()
+export function findAutoVenvPython(): string | null {
+  const isWin = process.platform === 'win32'
+  const pyBinary = isWin ? path.join('Scripts', 'python.exe') : path.join('bin', 'python')
+
+  // 1. Look for a TuxScale venv at <userData>/pytorch-env
+  try {
+    const userDataVenv = path.join(app.getPath('userData'), 'pytorch-env', pyBinary)
+    if (fs.existsSync(userDataVenv)) {
+      return userDataVenv
+    }
+  } catch {
+    // app.getPath might fail if called before app is ready
   }
-  return process.env.TUXSCALE_PYTHON_PATH || 'python3'
+
+  // 2. Look for a TuxScale venv at ~/.venvs/tuxscale (Linux/macOS)
+  try {
+    const homeVenv = path.join(os.homedir(), '.venvs', 'tuxscale', pyBinary)
+    if (fs.existsSync(homeVenv)) {
+      return homeVenv
+    }
+  } catch {
+    // Ignore
+  }
+
+  return null
+}
+
+export function resolvePythonCommand(customPath?: string): {
+  command: string
+  source: 'custom' | 'auto-venv' | 'system'
+} {
+  // A user-set custom Python path in Settings always wins
+  if (customPath && customPath.trim().length > 0) {
+    return { command: customPath.trim(), source: 'custom' }
+  }
+  if (process.env.TUXSCALE_PYTHON_PATH && process.env.TUXSCALE_PYTHON_PATH.trim().length > 0) {
+    return { command: process.env.TUXSCALE_PYTHON_PATH.trim(), source: 'custom' }
+  }
+
+  // Auto-detect a venv before falling back to system python3
+  const autoVenv = findAutoVenvPython()
+  if (autoVenv) {
+    return { command: autoVenv, source: 'auto-venv' }
+  }
+
+  return { command: 'python3', source: 'system' }
 }
 
 function runCmd(cmd: string, args: string[], timeout = 6000): Promise<string> {
@@ -40,16 +87,20 @@ function runCmd(cmd: string, args: string[], timeout = 6000): Promise<string> {
 }
 
 export async function detectPyTorch(customPythonPath?: string): Promise<PyTorchDetection> {
+  const pythonResolution = resolvePythonCommand(customPythonPath)
+  const pythonCmd = pythonResolution.command
+
   const details: PyTorchDetection['details'] = {
     nvidia: { ok: false, message: 'Checking NVIDIA GPU...' },
     python: { ok: false, message: 'Checking Python...' },
     torch: { ok: false, message: 'Checking PyTorch...' },
     cuda: { ok: false, message: 'Checking CUDA...' },
-    realesrgan: { ok: false, message: 'Checking Real-ESRGAN package...' },
+    realesrgan: { ok: false, message: 'Checking Real-ESRGAN and basicsr...' },
     script: { ok: false, message: 'Checking worker script...' }
   }
 
   let gpuName: string | undefined
+  let detectedVersion: string | undefined
 
   // 1. Check NVIDIA GPU
   try {
@@ -63,13 +114,15 @@ export async function detectPyTorch(customPythonPath?: string): Promise<PyTorchD
     } else {
       details.nvidia = {
         ok: false,
-        message: 'No NVIDIA GPU detected via nvidia-smi'
+        message: 'No NVIDIA GPU detected via nvidia-smi',
+        fixHint: 'Verify NVIDIA GPU connection and proprietary drivers are installed.'
       }
     }
   } catch {
     details.nvidia = {
       ok: false,
-      message: 'nvidia-smi not found or no NVIDIA driver installed'
+      message: 'nvidia-smi not found or no NVIDIA driver installed',
+      fixHint: 'Install NVIDIA GPU proprietary display drivers.'
     }
   }
 
@@ -83,67 +136,126 @@ export async function detectPyTorch(customPythonPath?: string): Promise<PyTorchD
   } else {
     details.script = {
       ok: false,
-      message: `Worker script not found at ${scriptPath}`
+      message: `Worker script not found at ${scriptPath}`,
+      fixHint: 'Verify the application installation integrity.'
     }
   }
 
-  // 3. Check Python
-  const pythonCmd = resolvePythonCommand(customPythonPath)
+  // 3. Check Python and Python version
   try {
-    const pyVer = await runCmd(pythonCmd, ['--version'])
+    const verScript =
+      'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")'
+    const pyVer = await runCmd(pythonCmd, ['-c', verScript])
+    detectedVersion = pyVer
+
+    const parts = pyVer.split('.').map((p) => parseInt(p, 10))
+    const major = parts[0] || 3
+    const minor = parts[1] || 0
+
+    const sourceTag =
+      pythonResolution.source === 'auto-venv'
+        ? ' (auto-detected venv)'
+        : pythonResolution.source === 'custom'
+          ? ' (custom)'
+          : ''
+
     details.python = {
       ok: true,
-      message: `${pyVer || 'Python'} (${pythonCmd})`
+      message: `Python ${pyVer}${sourceTag} at ${pythonCmd}`
+    }
+
+    // Show warning if Python is newer than 3.12 (e.g. 3.13, 3.14)
+    if (major === 3 && minor > 12) {
+      details.python.warning = true
+      details.python.warningMessage = `Python ${major}.${minor} may not be supported by PyTorch / Real-ESRGAN packages. Use a Python 3.11 or 3.12 virtualenv.`
     }
   } catch {
     details.python = {
       ok: false,
-      message: `Python not executable at "${pythonCmd}". Set custom path in Settings.`
+      message: `Python not executable at "${pythonCmd}". Set a valid virtualenv path in Settings.`,
+      fixHint: 'Create a Python 3.11 or 3.12 virtualenv or specify custom path.'
     }
-    details.torch = { ok: false, message: 'Python not found' }
+    details.torch = {
+      ok: false,
+      message: 'Python not found',
+      fixHint: 'Configure a valid Python environment first.'
+    }
     details.cuda = { ok: false, message: 'Python not found' }
     details.realesrgan = { ok: false, message: 'Python not found' }
 
     return {
       available: false,
       gpuName,
+      pythonInfo: {
+        command: pythonCmd,
+        version: detectedVersion,
+        source: pythonResolution.source
+      },
       details
     }
   }
 
-  // 4. Check PyTorch & CUDA & RealESRGAN
+  // 4. Real imports for PyTorch, CUDA, basicsr, and realesrgan
   try {
     const checkScript = `
 import sys
+import types
+
+# Test guarded shim for torchvision functional_tensor
+try:
+    import torchvision.transforms.functional_tensor
+except ImportError:
+    try:
+        import torchvision.transforms
+        import torchvision.transforms.functional as _F
+        _mod = types.ModuleType('torchvision.transforms.functional_tensor')
+        if hasattr(_F, 'rgb_to_grayscale'):
+            _mod.rgb_to_grayscale = _F.rgb_to_grayscale
+        sys.modules['torchvision.transforms.functional_tensor'] = _mod
+        setattr(torchvision.transforms, 'functional_tensor', _mod)
+    except Exception:
+        pass
+
+# Check PyTorch & CUDA
+torch_ver = "none"
+cuda_avail = False
+cuda_ver = "none"
+torch_err = ""
 try:
     import torch
     torch_ver = torch.__version__
     cuda_avail = torch.cuda.is_available()
     cuda_ver = torch.version.cuda if cuda_avail else "none"
 except Exception as e:
-    torch_ver = "err:" + str(e)
-    cuda_avail = False
-    cuda_ver = "none"
+    torch_err = str(e)
 
+# Check Real-ESRGAN & basicsr real imports
+realesrgan_ok = False
+realesrgan_err = ""
 try:
+    import basicsr
     import realesrgan
+    from realesrgan.archs.srvgg_arch import SRVGGNetCompact
     realesrgan_ok = True
 except Exception as e:
-    realesrgan_ok = False
+    realesrgan_err = str(e)
 
-print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}")
+print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}:::{torch_err}:::{realesrgan_err}")
 `
     const pyCheck = await runCmd(pythonCmd, ['-c', checkScript], 10000)
-    const [torchVer, cudaAvail, cudaVer, realesrganOk] = pyCheck.split(':::')
+    const [torchVer, cudaAvail, cudaVer, realesrganOk, torchErr, realesrganErr] =
+      pyCheck.split(':::')
 
-    if (torchVer.startsWith('err:')) {
+    if (torchVer === 'none' || torchErr) {
       details.torch = {
         ok: false,
-        message: 'PyTorch not installed. Run: pip install torch torchvision'
+        message: 'PyTorch is not installed in this environment',
+        details: torchErr || undefined,
+        fixHint: 'pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124'
       }
       details.cuda = {
         ok: false,
-        message: 'PyTorch required to check CUDA'
+        message: 'PyTorch required to check CUDA availability'
       }
     } else {
       details.torch = {
@@ -159,7 +271,9 @@ print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}")
       } else {
         details.cuda = {
           ok: false,
-          message: 'CUDA is not available in PyTorch. Install PyTorch with CUDA support.'
+          message: 'CUDA is not available in PyTorch (CPU-only build)',
+          fixHint:
+            'Reinstall PyTorch with CUDA support: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124'
         }
       }
     }
@@ -167,19 +281,29 @@ print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}")
     if (realesrganOk === 'True') {
       details.realesrgan = {
         ok: true,
-        message: 'Real-ESRGAN installed'
+        message: 'Real-ESRGAN and basicsr packages ready'
       }
     } else {
       details.realesrgan = {
         ok: false,
-        message: 'Real-ESRGAN not installed. Run: pip install basicsr realesrgan'
+        message: 'Real-ESRGAN or basicsr is not installed or failed to import',
+        details: realesrganErr || undefined,
+        fixHint: 'pip install basicsr realesrgan'
       }
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    details.torch = { ok: false, message: `Failed to inspect PyTorch: ${msg}` }
+    details.torch = {
+      ok: false,
+      message: `Failed to inspect PyTorch: ${msg}`,
+      fixHint: 'pip install torch torchvision'
+    }
     details.cuda = { ok: false, message: 'Failed to inspect CUDA' }
-    details.realesrgan = { ok: false, message: 'Failed to inspect Real-ESRGAN' }
+    details.realesrgan = {
+      ok: false,
+      message: 'Failed to inspect Real-ESRGAN',
+      fixHint: 'pip install basicsr realesrgan'
+    }
   }
 
   const isAvailable =
@@ -193,6 +317,11 @@ print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}")
   return {
     available: isAvailable,
     gpuName,
+    pythonInfo: {
+      command: pythonCmd,
+      version: detectedVersion,
+      source: pythonResolution.source
+    },
     details
   }
 }

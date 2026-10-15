@@ -47,11 +47,13 @@ try:
     import torchvision.transforms.functional_tensor  # noqa: F401
 except ImportError:
     try:
+        import torchvision.transforms
         import torchvision.transforms.functional as _F
         _mod = types.ModuleType('torchvision.transforms.functional_tensor')
         if hasattr(_F, 'rgb_to_grayscale'):
             _mod.rgb_to_grayscale = _F.rgb_to_grayscale
         sys.modules['torchvision.transforms.functional_tensor'] = _mod
+        setattr(torchvision.transforms, 'functional_tensor', _mod)
     except Exception:
         pass
 

@@ -30,6 +30,7 @@ export class PyTorchEngine implements Engine {
       backend: 'pytorch',
       available: detection.available,
       gpuName: detection.gpuName,
+      pythonInfo: detection.pythonInfo,
       details: detection.details
     }
   }
@@ -56,7 +57,7 @@ export class PyTorchEngine implements Engine {
       throw new Error(`PyTorch worker script not found at: ${scriptPath}`)
     }
 
-    const pythonBin = resolvePythonCommand(customPythonPath)
+    const pythonBin = resolvePythonCommand(customPythonPath).command
     const weightsDir = path.join(app.getPath('userData'), 'models')
 
     // PyTorch backend directly creates an MP4 file

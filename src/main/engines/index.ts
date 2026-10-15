@@ -86,6 +86,7 @@ export async function getAllEnginesStatus(
     activeBackend,
     preference,
     resolvedReason,
+    detectedPython: pytorchStatus.pythonInfo,
     engines: {
       ncnn: ncnnStatus,
       pytorch: pytorchStatus
