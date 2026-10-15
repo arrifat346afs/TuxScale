@@ -40,7 +40,18 @@ export class PyTorchEngine implements Engine {
   }
 
   async upscale(options: EngineUpscaleOptions): Promise<string> {
-    const { videoPath, model, scale, customPythonPath, tileSize, onProgress, sendLog } = options
+    const {
+      videoPath,
+      model,
+      scale,
+      customPythonPath,
+      tileSize,
+      onProgress,
+      sendLog,
+      pytorchLowVram,
+      pytorchEncoder,
+      pytorchSkipDuplicates
+    } = options
     const outputFormat = options.outputFormat ?? 'mp4'
 
     const detection = await this.detect(customPythonPath)
@@ -73,8 +84,13 @@ export class PyTorchEngine implements Engine {
       this.currentPartialFiles.push(finalOutputPath)
     }
 
+    const effectiveTile = pytorchLowVram ? (tileSize && tileSize > 0 ? tileSize : 512) : 0
+    const encoderChoice = pytorchEncoder ?? 'auto'
+
     sendLog(`[PyTorch] Starting stream upscale for ${path.basename(videoPath)}`)
-    sendLog(`[PyTorch] Model: ${model}, Scale: ${scale}x`)
+    sendLog(
+      `[PyTorch] Model: ${model}, Scale: ${scale}x (Tile: ${effectiveTile}, Encoder: ${encoderChoice})`
+    )
     sendLog(`[PyTorch] Target container: ${outputFormat}`)
 
     const args = [
@@ -88,12 +104,23 @@ export class PyTorchEngine implements Engine {
       '--scale',
       String(scale),
       '--tile',
-      String(tileSize ?? 0),
+      String(effectiveTile),
+      '--encoder',
+      encoderChoice,
       '--ffmpeg-bin',
       'ffmpeg',
       '--weights-dir',
       weightsDir
     ]
+
+    if (pytorchLowVram) {
+      args.push('--low-vram')
+    }
+    if (pytorchSkipDuplicates === false) {
+      args.push('--no-skip-duplicates')
+    } else {
+      args.push('--skip-duplicates')
+    }
 
     onProgress({
       current: 0,

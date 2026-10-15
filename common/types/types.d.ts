@@ -36,6 +36,8 @@ export type AllEnginesStatus = {
   engines: Record<BackendId, EngineStatus>
 }
 
+export type PyTorchEncoderMode = 'auto' | 'nvenc' | 'cpu'
+
 export type VideoUpscaylPayload = {
   videoPath: string
   outputPath?: string
@@ -47,6 +49,9 @@ export type VideoUpscaylPayload = {
   tileSize?: number
   batchSize?: number
   outputFormat?: string
+  pytorchLowVram?: boolean
+  pytorchEncoder?: PyTorchEncoderMode
+  pytorchSkipDuplicates?: boolean
 }
 
 export type FolderUpscaylPayload = Omit<VideoUpscaylPayload, 'videoPath'> & {

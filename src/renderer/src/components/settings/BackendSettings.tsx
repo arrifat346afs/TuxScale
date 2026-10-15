@@ -3,9 +3,14 @@ import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { Switch } from '../ui/switch'
 import { Badge } from '../ui/badge'
 import { EngineStatus } from './EngineStatus'
-import type { BackendPreference, AllEnginesStatus } from '../../../../../common/types/types'
+import type {
+  BackendPreference,
+  AllEnginesStatus,
+  PyTorchEncoderMode
+} from '../../../../../common/types/types'
 
 type BackendSettingsProps = {
   backend: BackendPreference
@@ -15,6 +20,12 @@ type BackendSettingsProps = {
   engineStatus: AllEnginesStatus | null
   isCheckingStatus: boolean
   onRefreshStatus: () => void
+  pytorchLowVram?: boolean
+  onPytorchLowVramChange?: (lowVram: boolean) => void
+  pytorchEncoder?: PyTorchEncoderMode
+  onPytorchEncoderChange?: (encoder: PyTorchEncoderMode) => void
+  pytorchSkipDuplicates?: boolean
+  onPytorchSkipDuplicatesChange?: (skipDuplicates: boolean) => void
 }
 
 export const BackendSettings: React.FC<BackendSettingsProps> = ({
@@ -24,10 +35,17 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
   onCustomPythonPathChange,
   engineStatus,
   isCheckingStatus,
-  onRefreshStatus
+  onRefreshStatus,
+  pytorchLowVram = false,
+  onPytorchLowVramChange,
+  pytorchEncoder = 'auto',
+  onPytorchEncoderChange,
+  pytorchSkipDuplicates = true,
+  onPytorchSkipDuplicatesChange
 }) => {
   const [tempPythonPath, setTempPythonPath] = useState(customPythonPath)
   const isDirty = tempPythonPath !== customPythonPath
+  const showPyTorchOptions = backend === 'pytorch' || engineStatus?.activeBackend === 'pytorch'
 
   const handleApplyPythonPath = (): void => {
     onCustomPythonPathChange(tempPythonPath.trim())
@@ -120,6 +138,74 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
           </div>
         )}
       </div>
+
+      {showPyTorchOptions && (
+        <div className="space-y-4 rounded-xl border border-border/60 bg-popover/50 p-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-semibold tracking-wide text-foreground uppercase">
+              PyTorch Acceleration
+            </h4>
+            <Badge variant="outline" className="text-[10px] text-primary border-primary/30">
+              CUDA
+            </Badge>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Video Encoder</Label>
+            <Select
+              value={pytorchEncoder}
+              onValueChange={(val) => onPytorchEncoderChange?.(val as PyTorchEncoderMode)}
+            >
+              <SelectTrigger className="w-full rounded-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto (NVENC with CPU fallback)</SelectItem>
+                <SelectItem value="nvenc">NVENC (Hardware Acceleration)</SelectItem>
+                <SelectItem value="cpu">CPU (Software libx264)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              NVENC offloads video encoding to NVIDIA NVENC hardware (H.264 up to 4K, HEVC up to
+              8K).
+            </p>
+          </div>
+
+          <div className="flex items-start justify-between gap-3 pt-1">
+            <div className="space-y-0.5">
+              <Label htmlFor="pytorch-low-vram" className="text-xs cursor-pointer">
+                Low VRAM Mode (Tiling)
+              </Label>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Uses 512px tiling to reduce memory on GPUs under 4 GB. On OOM, TuxScale
+                automatically falls back to tiling.
+              </p>
+            </div>
+            <Switch
+              id="pytorch-low-vram"
+              checked={pytorchLowVram}
+              onCheckedChange={(checked) => onPytorchLowVramChange?.(checked)}
+            />
+          </div>
+
+          <div className="flex items-start justify-between gap-3 pt-1">
+            <div className="space-y-0.5">
+              <Label htmlFor="pytorch-dedupe" className="text-xs cursor-pointer">
+                Skip Duplicate Frames
+              </Label>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Reuses previous upscaled frame for duplicate consecutive frames, saving GPU cycles
+                while preserving timing.
+              </p>
+            </div>
+            <Switch
+              id="pytorch-dedupe"
+              checked={pytorchSkipDuplicates}
+              onCheckedChange={(checked) => onPytorchSkipDuplicatesChange?.(checked)}
+            />
+          </div>
+        </div>
+      )}
 
       <EngineStatus
         status={engineStatus}

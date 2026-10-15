@@ -167,7 +167,10 @@ function registerIpcHandlers(): void {
       ttaMode,
       tileSize,
       outputFormat,
-      batchSize
+      batchSize,
+      pytorchLowVram,
+      pytorchEncoder,
+      pytorchSkipDuplicates
     } = payload
     const win = BrowserWindow.fromWebContents(event.sender)
 
@@ -182,6 +185,9 @@ function registerIpcHandlers(): void {
       tileSize,
       batchSize,
       outputFormat,
+      pytorchLowVram,
+      pytorchEncoder,
+      pytorchSkipDuplicates,
       onProgress: (data) => {
         win?.webContents.send(ELECTRON_COMMANDS.UPSCAYL_VIDEO_PROGRESS, data)
       },
@@ -210,7 +216,10 @@ function registerIpcHandlers(): void {
       ttaMode,
       tileSize,
       outputFormat,
-      batchSize
+      batchSize,
+      pytorchLowVram,
+      pytorchEncoder,
+      pytorchSkipDuplicates
     } = payload
     const win = BrowserWindow.fromWebContents(event.sender)
 
@@ -225,6 +234,9 @@ function registerIpcHandlers(): void {
       tileSize,
       batchSize,
       outputFormat,
+      pytorchLowVram,
+      pytorchEncoder,
+      pytorchSkipDuplicates,
       onProgress: (data) => {
         win?.webContents.send(ELECTRON_COMMANDS.UPSCAYL_VIDEO_PROGRESS, data)
       },

@@ -3,6 +3,8 @@ import type { ProgressData } from '../../renderer/src/types'
 export type BackendPreference = 'auto' | 'ncnn' | 'pytorch'
 export type BackendId = 'ncnn' | 'pytorch'
 
+export type PyTorchEncoderMode = 'auto' | 'nvenc' | 'cpu'
+
 export type EngineUpscaleOptions = {
   videoPath: string
   outputPath?: string
@@ -14,6 +16,9 @@ export type EngineUpscaleOptions = {
   tileSize?: number
   batchSize?: number
   outputFormat?: string
+  pytorchLowVram?: boolean
+  pytorchEncoder?: PyTorchEncoderMode
+  pytorchSkipDuplicates?: boolean
   onProgress: (data: ProgressData) => void
   sendLog: (message: string) => void
 }

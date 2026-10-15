@@ -4,7 +4,8 @@ import type {
   SystemInfo,
   BackendPreference,
   AllEnginesStatus,
-  BackendId
+  BackendId,
+  PyTorchEncoderMode
 } from '../../../../common/types/types'
 
 type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error'
@@ -47,6 +48,12 @@ type UseUpscaleReturn = {
   setTtaMode: (tta: boolean) => void
   tileSize: string
   setTileSize: (tileSize: string) => void
+  pytorchLowVram: boolean
+  setPytorchLowVram: (lowVram: boolean) => void
+  pytorchEncoder: PyTorchEncoderMode
+  setPytorchEncoder: (encoder: PyTorchEncoderMode) => void
+  pytorchSkipDuplicates: boolean
+  setPytorchSkipDuplicates: (skipDuplicates: boolean) => void
   batchSize: number
   setBatchSize: (size: number) => void
   outputFormat: string
@@ -95,6 +102,16 @@ export function useUpscale(): UseUpscaleReturn {
   })
   const [ttaMode, setTtaMode] = useState(false)
   const [tileSize, setTileSize] = useState('256')
+  const [pytorchLowVram, setPytorchLowVram] = useState<boolean>(() => {
+    return localStorage.getItem('pytorchLowVram') === 'true'
+  })
+  const [pytorchEncoder, setPytorchEncoder] = useState<PyTorchEncoderMode>(() => {
+    return (localStorage.getItem('pytorchEncoder') as PyTorchEncoderMode) || 'auto'
+  })
+  const [pytorchSkipDuplicates, setPytorchSkipDuplicates] = useState<boolean>(() => {
+    const saved = localStorage.getItem('pytorchSkipDuplicates')
+    return saved !== null ? saved === 'true' : true
+  })
   const [batchSize, setBatchSize] = useState(10)
 
   const [outputFormat, setOutputFormat] = useState(
@@ -137,6 +154,18 @@ export function useUpscale(): UseUpscaleReturn {
   useEffect(() => {
     localStorage.setItem('videoScale', String(scale[0]))
   }, [scale])
+
+  useEffect(() => {
+    localStorage.setItem('pytorchLowVram', String(pytorchLowVram))
+  }, [pytorchLowVram])
+
+  useEffect(() => {
+    localStorage.setItem('pytorchEncoder', pytorchEncoder)
+  }, [pytorchEncoder])
+
+  useEffect(() => {
+    localStorage.setItem('pytorchSkipDuplicates', String(pytorchSkipDuplicates))
+  }, [pytorchSkipDuplicates])
 
   const refreshEngineStatus = useCallback(async () => {
     setIsCheckingEngineStatus(true)
@@ -318,6 +347,9 @@ export function useUpscale(): UseUpscaleReturn {
     setLogs([])
     setProgress(null)
 
+    const effectiveTileSize =
+      activeBackend === 'pytorch' ? (pytorchLowVram ? 512 : 0) : parseInt(tileSize) || 0
+
     if (batchMode && folderPath) {
       await window.api.upscaleFolder({
         folderPath,
@@ -327,9 +359,12 @@ export function useUpscale(): UseUpscaleReturn {
         backend,
         customPythonPath: customPythonPath || undefined,
         ttaMode,
-        tileSize: parseInt(tileSize) || 0,
+        tileSize: effectiveTileSize,
         batchSize,
-        outputFormat
+        outputFormat,
+        pytorchLowVram,
+        pytorchEncoder,
+        pytorchSkipDuplicates
       })
       return
     }
@@ -342,9 +377,12 @@ export function useUpscale(): UseUpscaleReturn {
       backend,
       customPythonPath: customPythonPath || undefined,
       ttaMode,
-      tileSize: parseInt(tileSize) || 0,
+      tileSize: effectiveTileSize,
       batchSize,
-      outputFormat
+      outputFormat,
+      pytorchLowVram,
+      pytorchEncoder,
+      pytorchSkipDuplicates
     })
   }, [
     batchMode,
@@ -358,7 +396,11 @@ export function useUpscale(): UseUpscaleReturn {
     ttaMode,
     tileSize,
     batchSize,
-    outputFormat
+    outputFormat,
+    activeBackend,
+    pytorchLowVram,
+    pytorchEncoder,
+    pytorchSkipDuplicates
   ])
 
   const handleCancel = useCallback(() => {
@@ -402,6 +444,12 @@ export function useUpscale(): UseUpscaleReturn {
     setTtaMode,
     tileSize,
     setTileSize,
+    pytorchLowVram,
+    setPytorchLowVram,
+    pytorchEncoder,
+    setPytorchEncoder,
+    pytorchSkipDuplicates,
+    setPytorchSkipDuplicates,
     batchSize,
     setBatchSize,
     outputFormat,

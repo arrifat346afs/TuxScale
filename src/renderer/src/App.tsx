@@ -51,7 +51,13 @@ function App(): React.JSX.Element {
     updateState,
     updateInfo,
     handleCheckForUpdates,
-    handleInstallUpdate
+    handleInstallUpdate,
+    pytorchLowVram,
+    setPytorchLowVram,
+    pytorchEncoder,
+    setPytorchEncoder,
+    pytorchSkipDuplicates,
+    setPytorchSkipDuplicates
   } = useUpscale()
 
   return (
@@ -81,6 +87,12 @@ function App(): React.JSX.Element {
           onTtaModeChange={setTtaMode}
           tileSize={tileSize}
           onTileSizeChange={setTileSize}
+          pytorchLowVram={pytorchLowVram}
+          onPytorchLowVramChange={setPytorchLowVram}
+          pytorchEncoder={pytorchEncoder}
+          onPytorchEncoderChange={setPytorchEncoder}
+          pytorchSkipDuplicates={pytorchSkipDuplicates}
+          onPytorchSkipDuplicatesChange={setPytorchSkipDuplicates}
           batchSize={batchSize}
           onBatchSizeChange={setBatchSize}
           outputFormat={outputFormat}
