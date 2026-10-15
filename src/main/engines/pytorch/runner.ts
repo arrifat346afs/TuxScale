@@ -8,6 +8,47 @@ import { detectPyTorch, getScriptPath, resolvePythonCommand, type PyTorchDetecti
 import { parseProgressLine } from './progress'
 import { resolveOutputPath, FORMAT_CONFIG } from '../shared/output'
 
+export function resolvePyTorchWeightsDir(modelName?: string): string {
+  const candidates: string[] = []
+
+  // 1. Packaged resources or project root resources/models
+  const resourcesModels = app.isPackaged
+    ? path.join(process.resourcesPath, 'models')
+    : path.join(process.cwd(), 'resources', 'models')
+  candidates.push(resourcesModels)
+
+  // 2. Project root models (<cwd>/models)
+  const rootModels = path.join(process.cwd(), 'models')
+  candidates.push(rootModels)
+
+  // 3. User data directory (<userData>/models)
+  try {
+    const userDataModels = path.join(app.getPath('userData'), 'models')
+    candidates.push(userDataModels)
+  } catch {
+    // app.getPath might fail if electron app is not ready
+  }
+
+  // If a model is specified, search for the actual .pth file (project root first)
+  if (modelName) {
+    const filename = `${modelName}.pth`
+    for (const dir of candidates) {
+      if (fs.existsSync(path.join(dir, filename))) {
+        return dir
+      }
+    }
+  }
+
+  // If no weights file was found, prefer an existing directory (project root first)
+  for (const dir of candidates) {
+    if (fs.existsSync(dir)) {
+      return dir
+    }
+  }
+
+  return candidates[0] || path.join(app.getPath('userData'), 'models')
+}
+
 export const PYTORCH_MODELS = ['realesr-animevideov3']
 
 export class PyTorchEngine implements Engine {
@@ -36,7 +77,34 @@ export class PyTorchEngine implements Engine {
   }
 
   getModels(): string[] {
-    return [...PYTORCH_MODELS]
+    const models = new Set(PYTORCH_MODELS)
+    const dirs = [
+      app.isPackaged
+        ? path.join(process.resourcesPath, 'models')
+        : path.join(process.cwd(), 'resources', 'models'),
+      path.join(process.cwd(), 'models')
+    ]
+    try {
+      dirs.push(path.join(app.getPath('userData'), 'models'))
+    } catch {
+      // Ignore
+    }
+
+    for (const dir of dirs) {
+      if (fs.existsSync(dir)) {
+        try {
+          const files = fs.readdirSync(dir)
+          for (const file of files) {
+            if (file.endsWith('.pth')) {
+              models.add(path.basename(file, '.pth'))
+            }
+          }
+        } catch {
+          // Ignore read error
+        }
+      }
+    }
+    return Array.from(models)
   }
 
   async upscale(options: EngineUpscaleOptions): Promise<string> {
@@ -69,7 +137,7 @@ export class PyTorchEngine implements Engine {
     }
 
     const pythonBin = resolvePythonCommand(customPythonPath).command
-    const weightsDir = path.join(app.getPath('userData'), 'models')
+    const weightsDir = resolvePyTorchWeightsDir(model)
 
     // PyTorch backend directly creates an MP4 file
     const needsConversion = outputFormat !== 'mp4'
@@ -91,6 +159,7 @@ export class PyTorchEngine implements Engine {
     sendLog(
       `[PyTorch] Model: ${model}, Scale: ${scale}x (Tile: ${effectiveTile}, Encoder: ${encoderChoice})`
     )
+    sendLog(`[PyTorch] Weights directory: ${weightsDir}`)
     sendLog(`[PyTorch] Target container: ${outputFormat}`)
 
     const args = [

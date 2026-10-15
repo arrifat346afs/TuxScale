@@ -67,16 +67,60 @@ MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
 }
 
 
-def get_default_weights_dir() -> str:
+def get_weights_search_dirs(weights_dir: Optional[str] = None) -> list:
+    """
+    Returns ordered list of directories to search for model weights:
+    1. resources/models in current working directory (project root)
+    2. models in current working directory (project root)
+    3. Directory relative to this package: resources/models and project_root/models
+    4. Explicit weights_dir argument if passed
+    5. TUXSCALE_WEIGHTS_DIR environment variable if set
+    6. System / user config & data directories (userData/models, ~/.local/share/tuxscale/models)
+    """
+    dirs = []
+
+    cwd = os.getcwd()
+    dirs.append(os.path.join(cwd, 'resources', 'models'))
+    dirs.append(os.path.join(cwd, 'models'))
+
+    pkg_dir = os.path.dirname(os.path.abspath(__file__))
+    resources_dir = os.path.dirname(os.path.dirname(pkg_dir))
+    dirs.append(os.path.join(resources_dir, 'models'))
+    project_root = os.path.dirname(resources_dir)
+    dirs.append(os.path.join(project_root, 'models'))
+
+    if weights_dir:
+        dirs.append(os.path.abspath(weights_dir))
+
+    if 'TUXSCALE_WEIGHTS_DIR' in os.environ:
+        dirs.append(os.environ['TUXSCALE_WEIGHTS_DIR'])
+
+    config_home = os.environ.get('XDG_CONFIG_HOME', os.path.join(os.path.expanduser('~'), '.config'))
+    dirs.append(os.path.join(config_home, 'tuxscale', 'models'))
+
     data_home = os.environ.get('XDG_DATA_HOME', os.path.join(os.path.expanduser('~'), '.local', 'share'))
-    return os.environ.get(
-        'TUXSCALE_WEIGHTS_DIR',
-        os.path.join(data_home, 'tuxscale', 'models')
-    )
+    dirs.append(os.path.join(data_home, 'tuxscale', 'models'))
+
+    seen = set()
+    result = []
+    for d in dirs:
+        norm = os.path.normpath(d)
+        if norm not in seen:
+            seen.add(norm)
+            result.append(norm)
+    return result
 
 
-def download_weights(model_name: str, weights_dir: str, log_fn: Optional[Callable[[str], None]] = None) -> str:
-    """Download model weights if not present. Returns path to .pth file."""
+def get_default_weights_dir() -> str:
+    search_dirs = get_weights_search_dirs()
+    for d in search_dirs:
+        if os.path.exists(d):
+            return d
+    return search_dirs[0]
+
+
+def download_weights(model_name: str, weights_dir: Optional[str] = None, log_fn: Optional[Callable[[str], None]] = None) -> str:
+    """Download or locate model weights. Checks project root and resources/models first."""
     def _log(msg: str):
         if log_fn:
             log_fn(msg)
@@ -88,15 +132,51 @@ def download_weights(model_name: str, weights_dir: str, log_fn: Optional[Callabl
         _log(f"ERROR: Unknown model '{model_name}'. Available: {list(MODEL_REGISTRY.keys())}")
         sys.exit(1)
 
-    os.makedirs(weights_dir, exist_ok=True)
-    filepath = os.path.join(weights_dir, f"{model_name}.pth")
+    target_filename = f"{model_name}.pth"
+    search_dirs = get_weights_search_dirs(weights_dir)
 
-    if os.path.exists(filepath):
-        _log(f"Using cached model weights: {filepath}")
-        return filepath
+    # 1. Search for existing model weights in all candidate directories (project root first)
+    for d in search_dirs:
+        candidate = os.path.join(d, target_filename)
+        if os.path.exists(candidate):
+            _log(f"Using model weights: {candidate}")
+            return candidate
+
+    # 2. If not found, select first writable target directory to download
+    dest_dir = None
+    if weights_dir:
+        try:
+            os.makedirs(weights_dir, exist_ok=True)
+            test_file = os.path.join(weights_dir, '.write_test')
+            with open(test_file, 'w') as f:
+                f.write('ok')
+            os.remove(test_file)
+            dest_dir = weights_dir
+        except (OSError, PermissionError):
+            pass
+
+    if not dest_dir:
+        for d in search_dirs:
+            try:
+                os.makedirs(d, exist_ok=True)
+                test_file = os.path.join(d, '.write_test')
+                with open(test_file, 'w') as f:
+                    f.write('ok')
+                os.remove(test_file)
+                dest_dir = d
+                break
+            except (OSError, PermissionError):
+                continue
+
+    if not dest_dir:
+        dest_dir = os.path.join(os.path.expanduser('~'), '.cache', 'tuxscale', 'models')
+        os.makedirs(dest_dir, exist_ok=True)
+
+    filepath = os.path.join(dest_dir, target_filename)
 
     url = info['url']
-    _log(f"Model weights not found locally. Downloading {model_name}...")
+    _log(f"Model weights '{target_filename}' not found in project or cache directories.")
+    _log(f"Downloading {model_name}...")
     _log(f"Download URL: {url}")
     _log(f"Destination: {filepath}")
 
