@@ -7,7 +7,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-linux:
+    name: Build Linux Packages
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -15,19 +16,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Maximize build disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - uses: oven-sh/setup-bun@v2
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y rpm libarchive-tools zstd jq unzip
 
-      - name: Download latest backend binary
+      - name: Download latest backend binary (upscayl-bin)
         run: bash scripts/download-linux-binaries.sh
+
+      - name: Bundle Python runtime and PyTorch with CUDA
+        run: bash scripts/bundle-python-env.sh
 
       - name: Install dependencies
         run: npm install
@@ -39,30 +49,80 @@ jobs:
         id: version
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
-      - name: Upload artifacts
+      - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: tuxscale-linux
           path: dist/*
 
-  release:
-    needs: build
+  build-flatpak:
+    name: Build Flatpak Bundle
+    needs: build-linux
     runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Maximize build disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h
+
+      - name: Download Linux package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: tuxscale-linux
+          path: dist
+
+      - name: Prepare local Flatpak build context
+        run: |
+          mkdir -p flatpak
+          ZIP=$(ls dist/tuxscale-*.zip | head -1)
+          echo "Using zip package: $ZIP"
+          cp "$ZIP" flatpak/tuxscale-linux.zip
+
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: TuxScale.flatpak
+          manifest-path: flatpak/io.github.arrifat346afs.TuxScale.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: true
+          artifact-name: TuxScale-x86_64.flatpak
+
+  release:
+    name: Publish GitHub Release
+    needs: [build-linux, build-flatpak]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     permissions:
       contents: write
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      - name: Download Linux packages
+        uses: actions/download-artifact@v4
         with:
           name: tuxscale-linux
-          path: dist
+          path: release-assets
+
+      - name: Download Flatpak artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: TuxScale-x86_64.flatpak
+          path: release-assets
+
+      - name: List release assets
+        run: ls -la release-assets
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.build.outputs.version }}
-          release_name: TuxScale v${{ needs.build.outputs.version }}
-          files: dist/*
+          tag_name: v${{ needs.build-linux.outputs.version }}
+          release_name: TuxScale v${{ needs.build-linux.outputs.version }}
+          files: release-assets/*
           generate_release_notes: true

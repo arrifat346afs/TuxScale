@@ -12,6 +12,8 @@ finish-args:
   - --share=ipc
   - --socket=wayland
   - --socket=fallback-x11
+  - --filesystem=host
+  - --filesystem=home
 
 modules:
   - name: upscayl-ncnn
@@ -50,6 +52,8 @@ modules:
       - cp -r node_modules /app/tuxscale/
       - cp -r resources/models /app/tuxscale/resources/
       - cp -r resources/linux /app/tuxscale/resources/
+      - cp -r resources/python /app/tuxscale/resources/
+      - if [ -d resources/python-env ]; then cp -r resources/python-env /app/tuxscale/resources/; fi
       - install -Dm755 tuxscale-run /app/bin/
       - install -Dm644 resources/icons/512x512.png /app/share/icons/hicolor/512x512/apps/io.github.arrifat346afs.TuxScale.png
       - install -Dm644 resources/icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.arrifat346afs.TuxScale.png

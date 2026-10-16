@@ -11,7 +11,7 @@ export type PyTorchDetection = {
   pythonInfo: {
     command: string
     version?: string
-    source: 'custom' | 'auto-venv' | 'system'
+    source: 'custom' | 'auto-venv' | 'system' | 'bundled'
   }
   details: {
     nvidia: StatusCheckItem
@@ -27,6 +27,43 @@ export function getScriptPath(): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'python', 'tuxscale_upscale.py')
     : path.join(process.cwd(), 'resources', 'python', 'tuxscale_upscale.py')
+}
+
+export function findBundledPython(): string | null {
+  const isWin = process.platform === 'win32'
+  const pyNames = isWin ? ['python.exe'] : ['python3', 'python']
+  const candidates: string[] = []
+
+  // 1. In packaged app, resourcesPath contains python-env
+  if (app.isPackaged) {
+    for (const name of pyNames) {
+      candidates.push(path.join(process.resourcesPath, 'python-env', isWin ? 'Scripts' : 'bin', name))
+      candidates.push(path.join(process.resourcesPath, 'python-env', name))
+    }
+  }
+
+  // 2. In Flatpak, check /app/tuxscale/resources/python-env
+  for (const name of pyNames) {
+    candidates.push(path.join('/app', 'tuxscale', 'resources', 'python-env', isWin ? 'Scripts' : 'bin', name))
+  }
+
+  // 3. In dev / project directory
+  for (const name of pyNames) {
+    candidates.push(path.join(process.cwd(), 'resources', 'python-env', isWin ? 'Scripts' : 'bin', name))
+    candidates.push(path.join(process.cwd(), 'resources', 'python-env', name))
+  }
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        return candidate
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  return null
 }
 
 export function findAutoVenvPython(): string | null {
@@ -58,7 +95,7 @@ export function findAutoVenvPython(): string | null {
 
 export function resolvePythonCommand(customPath?: string): {
   command: string
-  source: 'custom' | 'auto-venv' | 'system'
+  source: 'custom' | 'bundled' | 'auto-venv' | 'system'
 } {
   // A user-set custom Python path in Settings always wins
   if (customPath && customPath.trim().length > 0) {
@@ -68,7 +105,13 @@ export function resolvePythonCommand(customPath?: string): {
     return { command: process.env.TUXSCALE_PYTHON_PATH.trim(), source: 'custom' }
   }
 
-  // Auto-detect a venv before falling back to system python3
+  // 1. Prioritize bundled standalone Python runtime
+  const bundled = findBundledPython()
+  if (bundled) {
+    return { command: bundled, source: 'bundled' }
+  }
+
+  // 2. Auto-detect a venv before falling back to system python3
   const autoVenv = findAutoVenvPython()
   if (autoVenv) {
     return { command: autoVenv, source: 'auto-venv' }
@@ -153,11 +196,13 @@ export async function detectPyTorch(customPythonPath?: string): Promise<PyTorchD
     const minor = parts[1] || 0
 
     const sourceTag =
-      pythonResolution.source === 'auto-venv'
-        ? ' (auto-detected venv)'
-        : pythonResolution.source === 'custom'
-          ? ' (custom)'
-          : ''
+      pythonResolution.source === 'bundled'
+        ? ' (bundled)'
+        : pythonResolution.source === 'auto-venv'
+          ? ' (auto-detected venv)'
+          : pythonResolution.source === 'custom'
+            ? ' (custom)'
+            : ''
 
     details.python = {
       ok: true,

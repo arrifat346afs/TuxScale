@@ -40,7 +40,7 @@ export type EngineStatus = {
   pythonInfo?: {
     command: string
     version?: string
-    source: 'custom' | 'auto-venv' | 'system'
+    source: 'custom' | 'auto-venv' | 'system' | 'bundled'
   }
 }
 
@@ -51,7 +51,7 @@ export type AllEnginesStatus = {
   detectedPython?: {
     command: string
     version?: string
-    source: 'custom' | 'auto-venv' | 'system'
+    source: 'custom' | 'auto-venv' | 'system' | 'bundled'
   }
   engines: Record<BackendId, EngineStatus>
 }

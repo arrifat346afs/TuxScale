@@ -71,30 +71,20 @@ echo "==> Using zip: $ZIP"
 echo "    SHA256: $SHA256"
 
 # Copy zip into the flatpak directory for local path reference
+mkdir -p flatpak
 cp "$ZIP" "flatpak/tuxscale-linux.zip"
 
-# ── 4. Generate a temporary manifest with local source ────────
-TMP_MANIFEST="flatpak/${APP_ID}.local.yml"
-echo "==> Generating temporary manifest: $TMP_MANIFEST"
-
-# Collapse YAML script continuation lines (backslash-newline) since
-# flatpak-builder's script source type treats each line as a separate command.
-perl -0pe 's/\\\n\s{2,}//g' "$MANIFEST" | \
-sed "s|url: https://github.com/rifat/tuxscale/releases/download/v1.0.0/tuxscale-1.0.0-linux-x64.zip|path: tuxscale-linux.zip|; \
-     s|sha256: PLACEHOLDER|sha256: $SHA256|" \
-  > "$TMP_MANIFEST"
-
-# ── 5. Build the Flatpak ─────────────────────────────────────
+# ── 4. Build the Flatpak ─────────────────────────────────────
 echo "==> Building Flatpak..."
-flatpak-builder --force-clean "$BUILD_DIR" "$TMP_MANIFEST"
+flatpak-builder --force-clean "$BUILD_DIR" "$MANIFEST"
 
-# ── 6. Install locally ───────────────────────────────────────
+# ── 5. Install locally ───────────────────────────────────────
 echo "==> Installing Flatpak..."
-flatpak-builder --user --install --force-clean "$BUILD_DIR" "$TMP_MANIFEST"
+flatpak-builder --user --install --force-clean "$BUILD_DIR" "$MANIFEST"
 
-# ── 7. Clean up ──────────────────────────────────────────────
+# ── 6. Clean up ──────────────────────────────────────────────
 echo "==> Cleaning up..."
-rm -f "$TMP_MANIFEST" "flatpak/tuxscale-linux.zip"
+rm -f "flatpak/tuxscale-linux.zip"
 
 echo ""
 echo "✓ Done! Run the app with: flatpak run $APP_ID"

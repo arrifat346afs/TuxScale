@@ -310,6 +310,14 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
                     >
                       {engineStatus.detectedPython.command}
                     </span>
+                    {engineStatus.detectedPython.source === 'bundled' && (
+                      <Badge
+                        variant="outline"
+                        className="text-[9px] py-0 px-1.5 text-purple-400 border-purple-500/30 shrink-0"
+                      >
+                        Bundled
+                      </Badge>
+                    )}
                     {engineStatus.detectedPython.source === 'auto-venv' && (
                       <Badge
                         variant="outline"

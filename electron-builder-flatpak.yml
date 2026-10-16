@@ -25,6 +25,8 @@ extraResources:
     to: 128x128.png
   - from: resources/python
     to: python
+  - from: resources/python-env
+    to: python-env
 
 linux:
   icon: resources/icons/
