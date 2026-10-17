@@ -1,11 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { cn } from '../lib/utils'
+import tuxscaleLogo from '../assets/tuxscale-logo.png'
 import { Button } from './ui/button'
 import { Progress } from './ui/progress'
-import { ScrollArea } from './ui/scroll-area'
-import { X } from 'lucide-react'
 import type { ProgressData } from '../types'
 import { IdleDisplay } from './IdleDisplay'
-import { BatchProgressHeader } from './BatchProgressHeader'
 
 type ProgressDisplayProps = {
   progress: ProgressData | null
@@ -18,18 +17,19 @@ type ProgressDisplayProps = {
   folderVideoCount: number
 }
 
-type ProgressStage = ProgressData['stage']
-
-const stageLabels: Record<ProgressStage, string> = {
-  extracting: 'Extracting Frames',
-  upscaling: 'Upscaling Frames',
-  reassembling: 'Reassembling Video',
-  done: 'Complete'
+function formatDuration(seconds: number): string {
+  if (isNaN(seconds) || seconds < 0) return '00:00'
+  const hrs = Math.floor(seconds / 3600)
+  const mins = Math.floor((seconds % 3600) / 60)
+  const secs = Math.floor(seconds % 60)
+  if (hrs > 0) {
+    return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
 }
 
 export const ProgressDisplay = ({
   progress,
-  logs,
   onCancel,
   isProcessing,
   batchMode,
@@ -37,14 +37,25 @@ export const ProgressDisplay = ({
   folderPath,
   folderVideoCount
 }: ProgressDisplayProps): React.ReactElement => {
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const startTimeRef = useRef<number>(Date.now())
+
+  const isDone = progress?.stage === 'done'
 
   useEffect(() => {
-    const viewport = scrollAreaRef.current?.querySelector('[data-slot="scroll-area-viewport"]')
-    if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight
+    if (!isProcessing) {
+      setElapsedSeconds(0)
+      return
     }
-  }, [logs])
+
+    if (isDone) return
+
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000))
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isProcessing, isDone])
 
   if (!progress && !isProcessing) {
     return (
@@ -57,72 +68,100 @@ export const ProgressDisplay = ({
     )
   }
 
-  const percent =
+  // Fraction of the current video completed (0.0 to 1.0)
+  const currentVideoFraction =
     progress && progress.overall !== undefined
-      ? Math.min(Math.round(progress.overall * 100), 100)
+      ? Math.max(0, Math.min(1, progress.overall))
       : progress && progress.total > 0
-        ? Math.min(Math.round((progress.current / progress.total) * 100), 100)
+        ? Math.max(0, Math.min(1, progress.current / progress.total))
         : 0
 
+  // Overall batch progress from video 1 to the last video
+  let overallFraction = currentVideoFraction
+  if (progress?.batchInfo && progress.batchInfo.totalVideos > 0) {
+    const { currentVideo, totalVideos } = progress.batchInfo
+    overallFraction = Math.max(
+      0,
+      Math.min(1, (currentVideo - 1 + currentVideoFraction) / totalVideos)
+    )
+  }
+
+  const percent = isDone ? 100 : Math.min(Math.round(overallFraction * 100), 100)
+
+  const remainingSeconds =
+    overallFraction > 0.01 && elapsedSeconds >= 3
+      ? Math.max(0, Math.round(elapsedSeconds / overallFraction - elapsedSeconds))
+      : null
+
+  const rawVideoName = progress?.batchInfo?.videoName || videoName || 'Video file'
+  const displayName = rawVideoName.split(/[/\\]/).pop() || rawVideoName
+
+  const countDisplay = progress?.batchInfo
+    ? `${progress.batchInfo.currentVideo}/${progress.batchInfo.totalVideos}`
+    : batchMode && folderVideoCount > 0
+      ? `1/${folderVideoCount}`
+      : `${percent}%`
+
   return (
-    <div className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-lg">
-      <div className="mb-5 text-center space-y-1">
-        {progress?.batchInfo ? (
-          <BatchProgressHeader batchInfo={progress.batchInfo} />
-        ) : (
-          videoName && <p className="text-sm text-muted-foreground">{videoName}</p>
-        )}
-        <h2 className="text-xl font-bold">Video Upscaling</h2>
+    <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-xl text-center flex flex-col items-center">
+      {/* Title & Video Subtitle */}
+      <div className="space-y-1 w-full text-center">
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">
+          {isDone ? 'Complete' : 'Upscaling'}
+        </h2>
+        <p className="text-sm text-muted-foreground truncate max-w-xs mx-auto">
+          {isDone ? 'Upscaling completed successfully!' : displayName}
+        </p>
       </div>
 
-      {progress && (
-        <div className="mb-5 space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">{stageLabels[progress.stage]}</span>
-              <span className="text-muted-foreground">{percent}%</span>
-            </div>
+      {/* Rotating Logo during upscaling */}
+      <div className="my-8 flex items-center justify-center [perspective:1000px]">
+        <img
+          src={tuxscaleLogo}
+          alt="TuxScale"
+          className={cn(
+            'size-36 select-none object-contain rounded-3xl drop-shadow-md',
+            isProcessing && !isDone && 'animate-spin-horizontal'
+          )}
+        />
+      </div>
 
-            <Progress
-              value={percent}
-              className="h-3 bg-secondary [&>[data-slot=progress-indicator]]:bg-violet-600"
-            />
+      {/* Progress Counter, Progress Bar & Timer */}
+      <div className="w-full space-y-3 mb-8">
+        <p className="text-base font-semibold text-primary text-center tracking-wide">
+          {countDisplay}
+        </p>
+        <Progress value={percent} className="h-3 w-full bg-secondary" />
 
-            {progress.message && (
-              <p className="text-sm text-muted-foreground">{progress.message}</p>
-            )}
-          </div>
-
-          {progress.stage === 'done' && (
-            <p className="text-center text-sm font-medium text-green-600 dark:text-green-400">
-              Upscaling completed successfully!
-            </p>
+        <div className="flex items-center justify-between text-xs text-muted-foreground px-0.5">
+          <span>
+            {isDone ? 'Total Time: ' : 'Elapsed: '}
+            <span className="font-mono font-medium text-foreground">
+              {formatDuration(elapsedSeconds)}
+            </span>
+          </span>
+          <span className="font-medium text-foreground">{percent}%</span>
+          {!isDone && remainingSeconds !== null ? (
+            <span>
+              Remaining:{' '}
+              <span className="font-mono font-medium text-foreground">
+                ~{formatDuration(remainingSeconds)}
+              </span>
+            </span>
+          ) : (
+            <span>{isDone ? 'Finished' : ''}</span>
           )}
         </div>
-      )}
+      </div>
 
-      {logs.length > 0 && (
-        <div className="mb-5 min-w-0 space-y-2">
-          <h3 className="text-sm font-semibold">Logs</h3>
-          <ScrollArea ref={scrollAreaRef} className="h-40 rounded-lg border bg-muted/50">
-            <div className="p-3">
-              {logs.map((log, i) => (
-                <p
-                  key={i}
-                  className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
-                >
-                  {log}
-                </p>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-      )}
-
+      {/* Cancel Button */}
       {isProcessing && (
-        <Button variant="destructive" className="w-full rounded-full" onClick={onCancel}>
-          <X />
-          Cancel
+        <Button
+          variant="destructive"
+          className="w-full h-11 rounded-full text-base font-medium cursor-pointer transition-colors"
+          onClick={onCancel}
+        >
+          {isDone ? 'Close' : 'Cancel'}
         </Button>
       )}
     </div>

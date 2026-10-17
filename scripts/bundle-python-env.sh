@@ -56,9 +56,39 @@ echo "==> Installing Real-ESRGAN, basicsr, and dependencies..."
   basicsr realesrgan numpy \
   --no-build-isolation
 
+# 4b. Patch BasicSR compatibility with modern torchvision (torchvision >= 0.17 removed functional_tensor)
+echo "==> Patching BasicSR compatibility with torchvision..."
+find "$TARGET_DIR" -type f -name "degradations.py" -exec sed -i \
+  's/torchvision\.transforms\.functional_tensor/torchvision.transforms.functional/g' {} +
+
+# Add sitecustomize.py to ensure backward compatibility across all imports in the bundled environment
+SITE_PACKAGES="$("$PYTHON_BIN" -c "import site; print(site.getsitepackages()[0])")"
+cat << 'EOF' > "$SITE_PACKAGES/sitecustomize.py"
+import sys
+import types
+
+try:
+    import torchvision.transforms.functional_tensor
+except ImportError:
+    try:
+        import torchvision.transforms
+        import torchvision.transforms.functional as _F
+        _mod = types.ModuleType('torchvision.transforms.functional_tensor')
+        for _attr in dir(_F):
+            if not _attr.startswith('__'):
+                setattr(_mod, _attr, getattr(_F, _attr))
+        sys.modules['torchvision.transforms.functional_tensor'] = _mod
+        setattr(torchvision.transforms, 'functional_tensor', _mod)
+    except Exception:
+        pass
+EOF
+
 # 5. Verify installation
 echo "==> Verifying bundled Python packages..."
 "$PYTHON_BIN" -c "import torch, torchvision, realesrgan, basicsr, numpy; print('✓ Bundled Python verification passed: Torch', torch.__version__, '| CUDA:', torch.version.cuda)"
+"$PYTHON_BIN" -c "from basicsr.data.degradations import rgb_to_grayscale; print('✓ BasicSR degradations import verified')"
+"$PYTHON_BIN" "$ROOT_DIR/resources/python/tuxscale_upscale.py" --help > /dev/null
+echo "✓ Verified tuxscale_upscale.py entrypoint execution"
 
 # 6. Download default PyTorch model weights (realesr-animevideov3.pth)
 WEIGHTS_PATH="$MODELS_DIR/realesr-animevideov3.pth"

@@ -11,7 +11,7 @@ type BatchProgressHeaderProps = {
 export function BatchProgressHeader({ batchInfo }: BatchProgressHeaderProps): React.ReactElement {
   return (
     <div className="text-center space-y-1">
-      <p className="text-sm font-medium text-violet-500">
+      <p className="text-sm font-medium text-primary">
         {batchInfo.currentVideo}/{batchInfo.totalVideos} done
       </p>
       <p className="text-xs text-muted-foreground">{batchInfo.videoName}</p>
