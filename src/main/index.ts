@@ -10,8 +10,15 @@ import { ELECTRON_COMMANDS } from '../../common/electron-commands'
 import { getModel } from './getmodel'
 import { upscaleSingleVideo, stopAllProcesses, type UpscaleVideoOptions } from './upscale'
 import { upscaleFolder, cancelBatch, type UpscaleFolderOptions } from './batch'
+import {
+  upscaleSingleImage,
+  upscaleImageFolder,
+  type UpscaleImageOptions,
+  type UpscaleImageFolderOptions
+} from './image-upscale'
 import { getVideoFiles } from './video-utils'
-import { getAllEnginesStatus, getEngine, type BackendPreference } from './engines'
+import { isImageFile, getImageFiles, IMAGE_MIME_TYPES } from './engines/shared/image-output'
+import { getAllEnginesStatus, getEngine, stopAllEngines, type BackendPreference } from './engines'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -44,6 +51,25 @@ function startVideoServer(): Promise<number> {
     const server = http.createServer((req, res) => {
       try {
         const reqUrl = new URL(req.url ?? '/', `http://127.0.0.1:${videoServerPort}`)
+
+        if (reqUrl.pathname === '/image') {
+          const filePath = decodeURIComponent(reqUrl.searchParams.get('path') ?? '')
+          if (!filePath || !fs.existsSync(filePath) || !isImageFile(filePath)) {
+            res.writeHead(404).end('Not found')
+            return
+          }
+          const ext = path.extname(filePath).toLowerCase()
+          const mimeType = IMAGE_MIME_TYPES[ext] ?? 'application/octet-stream'
+          const stat = fs.statSync(filePath)
+          res.writeHead(200, {
+            'Content-Length': String(stat.size),
+            'Content-Type': mimeType,
+            'Cache-Control': 'no-cache'
+          })
+          fs.createReadStream(filePath).pipe(res)
+          return
+        }
+
         if (reqUrl.pathname !== '/video') {
           res.writeHead(404).end('Not found')
           return
@@ -257,9 +283,147 @@ function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle(ELECTRON_COMMANDS.SELECT_IMAGE, async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openFile'],
+      filters: [
+        {
+          name: 'Images',
+          extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff', 'tif']
+        }
+      ]
+    })
+    if (result.canceled) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle(ELECTRON_COMMANDS.SELECT_IMAGE_FOLDER, async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openDirectory']
+    })
+    if (result.canceled) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle(ELECTRON_COMMANDS.GET_IMAGE_URL, async (_, imagePath: string) => {
+    const port = await startVideoServer()
+    return `http://127.0.0.1:${port}/image?path=${encodeURIComponent(imagePath)}`
+  })
+
+  ipcMain.handle(ELECTRON_COMMANDS.GET_FOLDER_IMAGES, async (_, folderPath: string) => {
+    try {
+      return getImageFiles(folderPath).map((filePath) => path.basename(filePath))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      throw new Error(`Failed to read folder images: ${message}`)
+    }
+  })
+
+  ipcMain.handle(ELECTRON_COMMANDS.UPSCALE_IMAGE, async (event, payload) => {
+    const {
+      imagePath,
+      outputPath,
+      model,
+      scale,
+      backend,
+      customPythonPath,
+      ttaMode,
+      tileSize,
+      outputFormat,
+      outputQuality,
+      pytorchLowVram
+    } = payload
+    const win = BrowserWindow.fromWebContents(event.sender)
+
+    const options: UpscaleImageOptions = {
+      imagePath,
+      outputPath,
+      model,
+      scale: String(scale),
+      backend,
+      customPythonPath,
+      ttaMode,
+      tileSize,
+      outputFormat,
+      outputQuality,
+      pytorchLowVram,
+      onProgress: (data) => {
+        win?.webContents.send(ELECTRON_COMMANDS.UPSCAYL_VIDEO_PROGRESS, data)
+        win?.webContents.send(ELECTRON_COMMANDS.UPSCALE_IMAGE_PROGRESS, data)
+      },
+      sendLog: (message) => {
+        win?.webContents.send(ELECTRON_COMMANDS.LOG, message)
+      }
+    }
+
+    try {
+      const resultPath = await upscaleSingleImage(options)
+      win?.webContents.send(ELECTRON_COMMANDS.UPSCAYL_VIDEO_DONE, { outputPath: resultPath })
+      win?.webContents.send(ELECTRON_COMMANDS.UPSCALE_IMAGE_DONE, { outputPath: resultPath })
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown error during image upscaling'
+      win?.webContents.send(ELECTRON_COMMANDS.UPSCAYL_ERROR, { message })
+    }
+  })
+
+  ipcMain.handle(ELECTRON_COMMANDS.FOLDER_UPSCALE_IMAGES, async (event, payload) => {
+    const {
+      folderPath,
+      outputPath,
+      model,
+      scale,
+      backend,
+      customPythonPath,
+      ttaMode,
+      tileSize,
+      outputFormat,
+      outputQuality,
+      pytorchLowVram
+    } = payload
+    const win = BrowserWindow.fromWebContents(event.sender)
+
+    const options: UpscaleImageFolderOptions = {
+      folderPath,
+      outputPath,
+      model,
+      scale: String(scale),
+      backend,
+      customPythonPath,
+      ttaMode,
+      tileSize,
+      outputFormat,
+      outputQuality,
+      pytorchLowVram,
+      onProgress: (data) => {
+        win?.webContents.send(ELECTRON_COMMANDS.UPSCAYL_VIDEO_PROGRESS, data)
+        win?.webContents.send(ELECTRON_COMMANDS.UPSCALE_IMAGE_PROGRESS, data)
+      },
+      sendLog: (message) => {
+        win?.webContents.send(ELECTRON_COMMANDS.LOG, message)
+      }
+    }
+
+    try {
+      const resultPaths = await upscaleImageFolder(options)
+      win?.webContents.send(ELECTRON_COMMANDS.UPSCAYL_VIDEO_DONE, {
+        outputPath: resultPaths[0] ?? ''
+      })
+      win?.webContents.send(ELECTRON_COMMANDS.UPSCALE_IMAGE_DONE, {
+        outputPath: resultPaths[0] ?? '',
+        outputPaths: resultPaths
+      })
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unknown error during batch image upscaling'
+      win?.webContents.send(ELECTRON_COMMANDS.UPSCAYL_ERROR, { message })
+    }
+  })
+
   ipcMain.on(ELECTRON_COMMANDS.STOP, () => {
     stopAllProcesses()
     cancelBatch()
+    stopAllEngines()
   })
 
   ipcMain.handle(ELECTRON_COMMANDS.GET_FOLDER_VIDEOS, async (_, folderPath: string) => {

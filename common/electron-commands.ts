@@ -40,7 +40,15 @@ const ELECTRON_COMMANDS = {
   UPDATE_ERROR: 'Update Error',
   UPDATE_DOWNLOAD_PROGRESS: 'Update Download Progress',
   UPDATE_DOWNLOADED: 'Update Downloaded',
-  GET_ENGINE_STATUS: 'Get Engine Status'
+  GET_ENGINE_STATUS: 'Get Engine Status',
+  SELECT_IMAGE: 'Select an Image',
+  SELECT_IMAGE_FOLDER: 'Select an Image Folder',
+  UPSCALE_IMAGE: 'Upscale Single Image',
+  UPSCALE_IMAGE_DONE: 'Image Upscaling Done',
+  UPSCALE_IMAGE_PROGRESS: 'Send Image Upscale Progress from Main to Renderer',
+  FOLDER_UPSCALE_IMAGES: 'Upscale Images in Folder',
+  GET_IMAGE_URL: 'Get image URL',
+  GET_FOLDER_IMAGES: 'Get image files in a folder'
 } as const
 
 export { ELECTRON_COMMANDS }
