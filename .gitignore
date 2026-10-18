@@ -7,6 +7,6 @@ out
 *.tsbuildinfo
 __pycache__/
 *.py[cod]
-*.pth
+
 resources/python-env/*
 !resources/python-env/.gitkeep
