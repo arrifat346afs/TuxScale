@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { FileVideo, Film, FolderOpen, FileImage, ImageIcon, AlertCircle, X } from 'lucide-react'
 import { ReactCompareSlider, ReactCompareSliderImage } from 'react-compare-slider'
 import { Button } from './ui/button'
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs'
 import { ProgressDisplay } from './ProgressDisplay'
 import { IdleDisplay } from './IdleDisplay'
 import type { ProgressData } from '../types'
@@ -25,6 +26,7 @@ const VALID_IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff', 'ti
 
 type MainContentProps = {
   upscaleMode: 'video' | 'image'
+  onUpscaleModeChange?: (mode: 'video' | 'image') => void
   batchMode: boolean
   videoPath: string | null
   folderPath: string | null
@@ -43,6 +45,7 @@ type MainContentProps = {
 
 export function MainContent({
   upscaleMode,
+  onUpscaleModeChange,
   batchMode,
   videoPath,
   folderPath,
@@ -211,9 +214,33 @@ export function MainContent({
       onDragLeave={handleDragLeave}
       onDoubleClick={handleDoubleClick}
     >
+      {/* Mode switch: Videos | Images */}
+      {!isProcessing && onUpscaleModeChange && (
+        <div
+          className="absolute top-6 left-1/2 -translate-x-1/2 z-30"
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <Tabs
+            value={upscaleMode}
+            onValueChange={(val) => onUpscaleModeChange(val as 'video' | 'image')}
+          >
+            <TabsList className="bg-muted/40 p-1 border border-border/40 shadow-sm backdrop-blur-md">
+              <TabsTrigger value="video" className="px-5 py-1.5 text-xs font-medium cursor-pointer">
+                <Film className="mr-1.5 size-3.5" />
+                Videos
+              </TabsTrigger>
+              <TabsTrigger value="image" className="px-5 py-1.5 text-xs font-medium cursor-pointer">
+                <ImageIcon className="mr-1.5 size-3.5" />
+                Images
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      )}
+
       {/* Drop rejection alert */}
       {dropError && (
-        <div className="absolute top-6 z-50 flex items-center gap-2 rounded-xl border border-destructive/50 bg-destructive/10 px-4 py-2.5 text-xs font-medium text-destructive backdrop-blur-md shadow-lg animate-in fade-in slide-in-from-top-2">
+        <div className="absolute top-20 z-50 flex items-center gap-2 rounded-xl border border-destructive/50 bg-destructive/10 px-4 py-2.5 text-xs font-medium text-destructive backdrop-blur-md shadow-lg animate-in fade-in slide-in-from-top-2">
           <AlertCircle className="size-4 shrink-0" />
           <span>{dropError}</span>
           <button

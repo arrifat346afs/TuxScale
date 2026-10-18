@@ -98,7 +98,6 @@ function App(): React.JSX.Element {
           outputFormat={upscale.outputFormat}
           onOutputFormatChange={upscale.setOutputFormat}
           upscaleMode={imageUpscale.upscaleMode}
-          onUpscaleModeChange={imageUpscale.setUpscaleMode}
           imageOutputFormat={imageUpscale.imageOutputFormat}
           onImageOutputFormatChange={imageUpscale.setImageOutputFormat}
           imageQuality={imageUpscale.imageQuality}
@@ -120,6 +119,7 @@ function App(): React.JSX.Element {
         />
         <MainContent
           upscaleMode={imageUpscale.upscaleMode}
+          onUpscaleModeChange={imageUpscale.setUpscaleMode}
           batchMode={activeBatchMode}
           videoPath={activeInputPath}
           folderPath={activeFolderPath}

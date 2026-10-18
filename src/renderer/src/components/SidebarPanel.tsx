@@ -74,7 +74,6 @@ type SidebarPanelProps = {
   outputFormat: string
   onOutputFormatChange: (format: string) => void
   upscaleMode: 'video' | 'image'
-  onUpscaleModeChange: (mode: 'video' | 'image') => void
   imageOutputFormat: 'png' | 'jpg' | 'webp'
   onImageOutputFormatChange: (format: 'png' | 'jpg' | 'webp') => void
   imageQuality: number
@@ -130,7 +129,6 @@ export const SidebarPanel = ({
   outputFormat,
   onOutputFormatChange,
   upscaleMode,
-  onUpscaleModeChange,
   imageOutputFormat,
   onImageOutputFormatChange,
   imageQuality,
@@ -181,22 +179,6 @@ export const SidebarPanel = ({
         <div className="space-y-6 p-5">
           {activeTab === 'upscale' ? (
             <>
-              {/* Mode switch: Videos | Images */}
-              <Tabs
-                value={upscaleMode}
-                onValueChange={(val) => onUpscaleModeChange(val as 'video' | 'image')}
-                className="w-full"
-              >
-                <TabsList className="grid w-full grid-cols-2 bg-muted/20 p-1">
-                  <TabsTrigger value="video" className="text-xs">
-                    Videos
-                  </TabsTrigger>
-                  <TabsTrigger value="image" className="text-xs">
-                    Images
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-
               <div className="flex items-center gap-2">
                 <Switch id="batch-mode" checked={batchMode} onCheckedChange={onBatchModeChange} />
                 <Label htmlFor="batch-mode" className="cursor-pointer">
