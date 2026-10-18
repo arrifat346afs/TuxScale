@@ -1,5 +1,15 @@
 import React, { useState } from 'react'
-import { Sliders, HelpCircle, Code2, ChevronDown, Terminal, Copy, Check } from 'lucide-react'
+import {
+  Sliders,
+  HelpCircle,
+  Code2,
+  ChevronDown,
+  Terminal,
+  Copy,
+  Check,
+  Zap,
+  Sparkles
+} from 'lucide-react'
 import { Label } from '../ui/label'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
@@ -8,6 +18,7 @@ import { Switch } from '../ui/switch'
 import { Badge } from '../ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { EngineStatus } from './EngineStatus'
+import { CudaPromptModal } from '../CudaPromptModal'
 import { cn } from '@/lib/utils'
 import type {
   BackendPreference,
@@ -57,9 +68,12 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
   const [tempPythonPath, setTempPythonPath] = useState(customPythonPath)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [installModalOpen, setInstallModalOpen] = useState(false)
 
   const isDirty = tempPythonPath !== customPythonPath
   const showPyTorchOptions = backend === 'pytorch' || engineStatus?.activeBackend === 'pytorch'
+  const isNvidiaGpu = !!engineStatus?.engines?.pytorch?.details?.nvidia?.ok
+  const isPyTorchReady = !!engineStatus?.engines?.pytorch?.available
 
   const handleApplyPythonPath = (): void => {
     onCustomPythonPathChange(tempPythonPath.trim())
@@ -87,6 +101,40 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
           onRefresh={onRefreshStatus}
           onOpenAdvanced={() => setAdvancedOpen(true)}
         />
+
+        {/* PyTorch CUDA Environment Action Card */}
+        {isNvidiaGpu && (
+          <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3 shadow-xs">
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-0.5 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <Zap className="size-4 text-emerald-400 shrink-0" />
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
+                    PyTorch CUDA Acceleration
+                  </h3>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {isPyTorchReady
+                    ? 'CUDA acceleration is active in ~/.config/tuxscale/pytorch-env.'
+                    : 'Install PyTorch with CUDA into ~/.config/tuxscale/pytorch-env to enable GPU upscaling.'}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant={isPyTorchReady ? 'outline' : 'default'}
+                className={cn(
+                  'rounded-xl text-xs h-8 px-3 shrink-0 gap-1.5 cursor-pointer',
+                  !isPyTorchReady &&
+                    'bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-xs'
+                )}
+                onClick={() => setInstallModalOpen(true)}
+              >
+                <Sparkles className="size-3.5" />
+                <span>{isPyTorchReady ? 'Reinstall / Update' : 'Install CUDA (~/.config)'}</span>
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* =========================================================================
             CARD 2: Processing & Performance Card
@@ -413,6 +461,16 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
             </div>
           )}
         </div>
+
+        <CudaPromptModal
+          isOpen={installModalOpen}
+          onClose={() => setInstallModalOpen(false)}
+          onSuccess={() => {
+            onRefreshStatus()
+            onBackendChange('pytorch')
+          }}
+          gpuName={engineStatus?.engines?.pytorch?.details?.nvidia?.message}
+        />
       </div>
     </TooltipProvider>
   )

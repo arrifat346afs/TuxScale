@@ -62,6 +62,12 @@ interface Api {
   onUpdateDownloaded: (
     callback: (data: { version: string; releaseDate?: string; releaseName?: string }) => void
   ) => () => void
+
+  installPyTorchEnv: () => Promise<{ success: boolean; error?: string }>
+  cancelPyTorchInstall: () => void
+  onPyTorchInstallProgress: (
+    callback: (data: { percent: number; message: string; log?: string }) => void
+  ) => () => void
 }
 
 declare global {

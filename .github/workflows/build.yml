@@ -55,9 +55,6 @@ jobs:
       - name: Download latest backend binary (upscayl-bin)
         run: bash scripts/download-linux-binaries.sh
 
-      - name: Bundle Python runtime and PyTorch with CUDA
-        run: bash scripts/bundle-python-env.sh
-
       - name: Install dependencies
         run: bun install
 

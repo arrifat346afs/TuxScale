@@ -19,6 +19,7 @@ import {
 import { getVideoFiles } from './video-utils'
 import { isImageFile, getImageFiles, IMAGE_MIME_TYPES } from './engines/shared/image-output'
 import { getAllEnginesStatus, getEngine, stopAllEngines, type BackendPreference } from './engines'
+import { installPyTorchEnv, cancelPyTorchInstall } from './engines/pytorch/installer'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -450,6 +451,20 @@ function registerIpcHandlers(): void {
     const preference = (payload?.preference as BackendPreference) ?? 'auto'
     const customPythonPath: string | undefined = payload?.customPythonPath
     return getAllEnginesStatus(preference, customPythonPath)
+  })
+
+  ipcMain.handle(ELECTRON_COMMANDS.INSTALL_PYTORCH_ENV, async (event) => {
+    return installPyTorchEnv((progress) => {
+      try {
+        event.sender.send(ELECTRON_COMMANDS.PYTORCH_INSTALL_PROGRESS, progress)
+      } catch {
+        // Window may have closed
+      }
+    })
+  })
+
+  ipcMain.on(ELECTRON_COMMANDS.CANCEL_PYTORCH_INSTALL, () => {
+    cancelPyTorchInstall()
   })
 
   ipcMain.handle(ELECTRON_COMMANDS.GET_SYSTEM_INFO, async () => {

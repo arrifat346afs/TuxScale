@@ -192,6 +192,23 @@ const api = {
     return () => {
       ipcRenderer.removeListener(ELECTRON_COMMANDS.UPDATE_DOWNLOADED, handler)
     }
+  },
+
+  installPyTorchEnv: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.INSTALL_PYTORCH_ENV),
+
+  cancelPyTorchInstall: (): void => ipcRenderer.send(ELECTRON_COMMANDS.CANCEL_PYTORCH_INSTALL),
+
+  onPyTorchInstallProgress: (
+    callback: (data: { percent: number; message: string; log?: string }) => void
+  ) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: unknown): void => {
+      callback(data as { percent: number; message: string; log?: string })
+    }
+    ipcRenderer.on(ELECTRON_COMMANDS.PYTORCH_INSTALL_PROGRESS, handler)
+    return () => {
+      ipcRenderer.removeListener(ELECTRON_COMMANDS.PYTORCH_INSTALL_PROGRESS, handler)
+    }
   }
 }
 

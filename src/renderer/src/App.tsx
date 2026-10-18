@@ -1,14 +1,22 @@
+import { useState } from 'react'
 import { ThemeProvider } from './components/theme-provider'
 import { SidebarPanel } from './components/SidebarPanel'
 import { MainContent } from './components/MainContent'
+import { CudaPromptModal } from './components/CudaPromptModal'
 import { useUpscale } from './hooks/useUpscale'
 import { useImageUpscale } from './hooks/useImageUpscale'
 
 function App(): React.JSX.Element {
   const upscale = useUpscale()
   const imageUpscale = useImageUpscale()
-
   const isImageMode = imageUpscale.upscaleMode === 'image'
+
+  const isNvidiaOk = !!upscale.engineStatus?.engines?.pytorch?.details?.nvidia?.ok
+  const isPyTorchAvailable = !!upscale.engineStatus?.engines?.pytorch?.available
+  const [modalDismissed, setModalDismissed] = useState(
+    () => localStorage.getItem('cudaPromptDismissed') === 'true'
+  )
+  const showCudaModal = isNvidiaOk && !isPyTorchAvailable && !modalDismissed
 
   const activeBatchMode = isImageMode ? imageUpscale.imageBatchMode : upscale.batchMode
   const handleActiveBatchModeChange = isImageMode
@@ -134,6 +142,16 @@ function App(): React.JSX.Element {
           onSelectFolder={handleSelectActiveFolder}
           onVideoDropped={handleActiveInputDropped}
           onCancel={upscale.handleCancel}
+        />
+        <CudaPromptModal
+          isOpen={showCudaModal}
+          onClose={() => setModalDismissed(true)}
+          onSuccess={() => {
+            setModalDismissed(true)
+            upscale.refreshEngineStatus()
+            upscale.setBackend('pytorch')
+          }}
+          gpuName={upscale.engineStatus?.engines?.pytorch?.details?.nvidia?.message}
         />
       </div>
     </ThemeProvider>

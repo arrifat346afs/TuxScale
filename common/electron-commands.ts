@@ -48,7 +48,10 @@ const ELECTRON_COMMANDS = {
   UPSCALE_IMAGE_PROGRESS: 'Send Image Upscale Progress from Main to Renderer',
   FOLDER_UPSCALE_IMAGES: 'Upscale Images in Folder',
   GET_IMAGE_URL: 'Get image URL',
-  GET_FOLDER_IMAGES: 'Get image files in a folder'
+  GET_FOLDER_IMAGES: 'Get image files in a folder',
+  INSTALL_PYTORCH_ENV: 'Install PyTorch CUDA Environment',
+  CANCEL_PYTORCH_INSTALL: 'Cancel PyTorch CUDA Environment Installation',
+  PYTORCH_INSTALL_PROGRESS: 'PyTorch CUDA Environment Installation Progress'
 } as const
 
 export { ELECTRON_COMMANDS }

@@ -1,6 +1,7 @@
 # TuxScale Project Instructions & Rules
 
 ## Package Manager
+
 - **Always use Bun** (`bun`) for installing dependencies, running scripts, and development:
   - Install: `bun install`
   - Dev server: `bun run dev` (or `bun dev`)

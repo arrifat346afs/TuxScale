@@ -81,26 +81,34 @@ export function findBundledPython(): string | null {
 
 export function findAutoVenvPython(): string | null {
   const isWin = process.platform === 'win32'
-  const pyBinary = isWin ? path.join('Scripts', 'python.exe') : path.join('bin', 'python')
+  const pyNames = isWin ? ['Scripts/python.exe'] : ['bin/python3', 'bin/python']
 
-  // 1. Look for a TuxScale venv at <userData>/pytorch-env
+  const candidateDirs: string[] = []
+
+  // 1. Electron userData directory (e.g. ~/.config/tuxscale/pytorch-env)
   try {
-    const userDataVenv = path.join(app.getPath('userData'), 'pytorch-env', pyBinary)
-    if (fs.existsSync(userDataVenv)) {
-      return userDataVenv
-    }
+    candidateDirs.push(path.join(app.getPath('userData'), 'pytorch-env'))
   } catch {
     // app.getPath might fail if called before app is ready
   }
 
-  // 2. Look for a TuxScale venv at ~/.venvs/tuxscale (Linux/macOS)
-  try {
-    const homeVenv = path.join(os.homedir(), '.venvs', 'tuxscale', pyBinary)
-    if (fs.existsSync(homeVenv)) {
-      return homeVenv
+  // 2. Standard ~/.config/tuxscale/pytorch-env
+  candidateDirs.push(path.join(os.homedir(), '.config', 'tuxscale', 'pytorch-env'))
+
+  // 3. System venv at ~/.venvs/tuxscale
+  candidateDirs.push(path.join(os.homedir(), '.venvs', 'tuxscale'))
+
+  for (const dir of candidateDirs) {
+    for (const rel of pyNames) {
+      const candidate = path.join(dir, rel)
+      try {
+        if (fs.existsSync(candidate)) {
+          return candidate
+        }
+      } catch {
+        // Ignore
+      }
     }
-  } catch {
-    // Ignore
   }
 
   return null
