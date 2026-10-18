@@ -27,7 +27,7 @@ bun run build
 
 # ── 2. Package only the zip ───────────────────────────────────
 echo "==> Packaging Linux zip..."
-ZIP="dist/tuxscale-${npm_package_version:-1.2.0}-linux-x64.zip"
+ZIP="dist/tuxscale-${npm_package_version:-1.2.2}-linux-x64.zip"
 
 # Try electron-builder first, fall back to manual packaging
 if npx electron-builder --linux zip 2>/dev/null; then
