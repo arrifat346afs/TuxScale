@@ -64,8 +64,11 @@ type UseUpscaleReturn = {
   outputPath: string | null
   upscaledVideoPath: string | null
   isProcessing: boolean
+  setIsProcessing: (processing: boolean) => void
   progress: ProgressData | null
+  setProgress: (progress: ProgressData | null) => void
   logs: string[]
+  setLogs: React.Dispatch<React.SetStateAction<string[]>>
   videoName: string | null
   systemInfo: SystemInfo | null
   handleVideoSelected: (path: string) => void
@@ -460,8 +463,11 @@ export function useUpscale(): UseUpscaleReturn {
     outputPath,
     upscaledVideoPath,
     isProcessing,
+    setIsProcessing,
     progress,
+    setProgress,
     logs,
+    setLogs,
     videoName,
     systemInfo,
     handleVideoSelected,

@@ -6,6 +6,7 @@ import { Button } from './ui/button'
 import { Progress } from './ui/progress'
 import type { ProgressData } from '../types'
 import { IdleDisplay } from './IdleDisplay'
+import { BatchProgressHeader } from './BatchProgressHeader'
 
 type ProgressDisplayProps = {
   progress: ProgressData | null
@@ -16,6 +17,7 @@ type ProgressDisplayProps = {
   videoName: string | null
   folderPath: string | null
   folderVideoCount: number
+  mode?: 'video' | 'image'
 }
 
 function formatDuration(seconds: number): string {
@@ -37,7 +39,8 @@ export const ProgressDisplay = ({
   batchMode,
   videoName,
   folderPath,
-  folderVideoCount
+  folderVideoCount,
+  mode = 'video'
 }: ProgressDisplayProps): React.ReactElement => {
   const [showLogs, setShowLogs] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -95,6 +98,7 @@ export const ProgressDisplay = ({
         folderPath={folderPath}
         folderVideoCount={folderVideoCount}
         batchMode={batchMode}
+        mode={mode}
       />
     )
   }
@@ -124,13 +128,14 @@ export const ProgressDisplay = ({
       ? Math.max(0, Math.round(elapsedSeconds / overallFraction - elapsedSeconds))
       : null
 
-  const rawVideoName = progress?.batchInfo?.videoName || videoName || 'Video file'
+  const rawVideoName =
+    progress?.batchInfo?.videoName || videoName || (mode === 'image' ? 'Image file' : 'Video file')
   const displayName = rawVideoName.split(/[/\\]/).pop() || rawVideoName
 
   const countDisplay = progress?.batchInfo
-    ? `${progress.batchInfo.currentVideo}/${progress.batchInfo.totalVideos}`
+    ? `${progress.batchInfo.currentVideo}/${progress.batchInfo.totalVideos} done`
     : batchMode && folderVideoCount > 0
-      ? `1/${folderVideoCount}`
+      ? `1/${folderVideoCount} done`
       : `${percent}%`
 
   return (
@@ -145,9 +150,13 @@ export const ProgressDisplay = ({
         <h2 className="text-2xl font-bold tracking-tight text-foreground">
           {isDone ? 'Complete' : 'Upscaling'}
         </h2>
-        <p className="text-sm text-muted-foreground truncate max-w-xs mx-auto">
-          {isDone ? 'Upscaling completed successfully!' : displayName}
-        </p>
+        {progress?.batchInfo ? (
+          <BatchProgressHeader batchInfo={progress.batchInfo} />
+        ) : (
+          <p className="text-sm text-muted-foreground truncate max-w-xs mx-auto">
+            {isDone ? 'Upscaling completed successfully!' : displayName}
+          </p>
+        )}
       </div>
 
       {/* Either Rotating Logo OR Logs */}

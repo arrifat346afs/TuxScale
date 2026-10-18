@@ -1,30 +1,47 @@
-import { ArrowDownToLine, FolderOpen, MousePointer2, Video } from 'lucide-react'
+import { ArrowDownToLine, FolderOpen, MousePointer2, Video, Image as ImageIcon } from 'lucide-react'
 
 type IdleDisplayProps = {
-  videoName: string | null
-  folderPath: string | null
-  folderVideoCount: number
+  videoName?: string | null
+  folderPath?: string | null
+  folderVideoCount?: number
   batchMode: boolean
+  mode?: 'video' | 'image'
 }
 
-export function IdleDisplay({ batchMode }: IdleDisplayProps): React.ReactElement {
+export function IdleDisplay({ batchMode, mode = 'video' }: IdleDisplayProps): React.ReactElement {
+  const isImage = mode === 'image'
+
   return (
     <div className="z-10 max-w-sm text-center">
       <div className="mb-6 flex items-center justify-center">
         <div className="rounded-2xl border bg-card p-5 shadow-sm">
           {batchMode ? (
             <FolderOpen className="size-10 text-muted-foreground" />
+          ) : isImage ? (
+            <ImageIcon className="size-10 text-muted-foreground" />
           ) : (
             <Video className="size-10 text-muted-foreground" />
           )}
         </div>
       </div>
 
-      <h2 className="mb-2 text-2xl font-bold">{batchMode ? 'Batch Upscale' : 'Video Upscale'}</h2>
+      <h2 className="mb-2 text-2xl font-bold">
+        {batchMode
+          ? isImage
+            ? 'Batch Image Upscale'
+            : 'Batch Upscale'
+          : isImage
+            ? 'Image Upscale'
+            : 'Video Upscale'}
+      </h2>
       <p className="mb-6 text-sm text-muted-foreground">
         {batchMode
-          ? 'Select a folder containing videos to upscale them all at once.'
-          : 'Select a video or drag and drop it here to start upscaling.'}
+          ? isImage
+            ? 'Select a folder containing images to upscale them all at once.'
+            : 'Select a folder containing videos to upscale them all at once.'
+          : isImage
+            ? 'Select an image or drag and drop it here to start upscaling.'
+            : 'Select a video or drag and drop it here to start upscaling.'}
       </p>
 
       <div className="space-y-3 rounded-2xl border bg-card p-4 text-left shadow-sm">
@@ -34,11 +51,13 @@ export function IdleDisplay({ batchMode }: IdleDisplayProps): React.ReactElement
           </div>
           <div>
             <p className="text-sm font-medium">
-              {batchMode ? 'Select a folder' : 'Select a video'}
+              {batchMode ? 'Select a folder' : isImage ? 'Select an image' : 'Select a video'}
             </p>
             <p className="text-xs text-muted-foreground">
               {batchMode
-                ? 'Pick the folder that contains your videos.'
+                ? isImage
+                  ? 'Pick the folder that contains your images.'
+                  : 'Pick the folder that contains your videos.'
                 : 'Click the button or double-click this area.'}
             </p>
           </div>

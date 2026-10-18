@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useMemo, useState } from 'react'
-import { FileVideo, Film, FolderOpen } from 'lucide-react'
-import { ReactCompareSlider } from 'react-compare-slider'
+import { FileVideo, Film, FolderOpen, FileImage, ImageIcon, AlertCircle, X } from 'lucide-react'
+import { ReactCompareSlider, ReactCompareSliderImage } from 'react-compare-slider'
 import { Button } from './ui/button'
 import { ProgressDisplay } from './ProgressDisplay'
 import { IdleDisplay } from './IdleDisplay'
@@ -21,7 +21,10 @@ const VALID_VIDEO_EXTENSIONS = [
   'mpg'
 ]
 
+const VALID_IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff', 'tif']
+
 type MainContentProps = {
+  upscaleMode: 'video' | 'image'
   batchMode: boolean
   videoPath: string | null
   folderPath: string | null
@@ -39,6 +42,7 @@ type MainContentProps = {
 }
 
 export function MainContent({
+  upscaleMode,
   batchMode,
   videoPath,
   folderPath,
@@ -55,17 +59,25 @@ export function MainContent({
   onCancel
 }: MainContentProps): React.ReactElement {
   const [isDragging, setIsDragging] = useState(false)
-  const [videoUrl, setVideoUrl] = useState<string | null>(null)
-  const [upscaledVideoUrl, setUpscaledVideoUrl] = useState<string | null>(null)
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null)
+  const [upscaledMediaUrl, setUpscaledMediaUrl] = useState<string | null>(null)
+  const [dropError, setDropError] = useState<string | null>(null)
 
   const showIdle = useMemo(() => {
     if (batchMode) return folderPath === null
     return videoPath === null
   }, [batchMode, videoPath, folderPath])
 
+  // Clear drop error after 5 seconds
+  useEffect(() => {
+    if (!dropError) return
+    const timer = setTimeout(() => setDropError(null), 5000)
+    return (): void => clearTimeout(timer)
+  }, [dropError])
+
   useEffect(() => {
     if (!videoPath) {
-      setVideoUrl(null)
+      setMediaUrl(null)
       return
     }
     if (
@@ -73,25 +85,49 @@ export function MainContent({
       videoPath.startsWith('https://') ||
       videoPath.startsWith('local-file://')
     ) {
-      setVideoUrl(videoPath)
+      setMediaUrl(videoPath)
       return
     }
-    window.api
-      .getVideoUrl(videoPath)
-      .then(setVideoUrl)
-      .catch(() => setVideoUrl(null))
-  }, [videoPath])
+
+    if (upscaleMode === 'image') {
+      window.api
+        .getImageUrl(videoPath)
+        .then(setMediaUrl)
+        .catch(() => setMediaUrl(null))
+    } else {
+      window.api
+        .getVideoUrl(videoPath)
+        .then(setMediaUrl)
+        .catch(() => setMediaUrl(null))
+    }
+  }, [videoPath, upscaleMode])
 
   useEffect(() => {
     if (!upscaledVideoPath) {
-      setUpscaledVideoUrl(null)
+      setUpscaledMediaUrl(null)
       return
     }
-    window.api
-      .getVideoUrl(upscaledVideoPath)
-      .then(setUpscaledVideoUrl)
-      .catch(() => setUpscaledVideoUrl(null))
-  }, [upscaledVideoPath])
+    if (
+      upscaledVideoPath.startsWith('http://') ||
+      upscaledVideoPath.startsWith('https://') ||
+      upscaledVideoPath.startsWith('local-file://')
+    ) {
+      setUpscaledMediaUrl(upscaledVideoPath)
+      return
+    }
+
+    if (upscaleMode === 'image') {
+      window.api
+        .getImageUrl(upscaledVideoPath)
+        .then(setUpscaledMediaUrl)
+        .catch(() => setUpscaledMediaUrl(null))
+    } else {
+      window.api
+        .getVideoUrl(upscaledVideoPath)
+        .then(setUpscaledMediaUrl)
+        .catch(() => setUpscaledMediaUrl(null))
+    }
+  }, [upscaledVideoPath, upscaleMode])
 
   const handleDragEnter = (e: React.DragEvent): void => {
     e.preventDefault()
@@ -110,17 +146,39 @@ export function MainContent({
   const handleDrop = (e: React.DragEvent): void => {
     e.preventDefault()
     setIsDragging(false)
+    setDropError(null)
 
     if (e.dataTransfer.files.length === 0) return
     const file = e.dataTransfer.files[0]
     const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
 
-    if (!VALID_VIDEO_EXTENSIONS.includes(extension)) return
-
-    if (batchMode) {
-      void onSelectFolder()
-    } else if ('path' in file && typeof file.path === 'string') {
-      onVideoDropped(file.path)
+    const isImage = upscaleMode === 'image'
+    if (isImage) {
+      if (VALID_IMAGE_EXTENSIONS.includes(extension)) {
+        if (batchMode) {
+          void onSelectFolder()
+        } else if ('path' in file && typeof file.path === 'string') {
+          onVideoDropped(file.path)
+        }
+      } else if (VALID_VIDEO_EXTENSIONS.includes(extension)) {
+        setDropError('Selected file is a video. Please switch to Video mode to upscale videos.')
+      } else {
+        setDropError(
+          `Unsupported image format: .${extension}. Supported: PNG, JPG, WEBP, BMP, TIFF.`
+        )
+      }
+    } else {
+      if (VALID_VIDEO_EXTENSIONS.includes(extension)) {
+        if (batchMode) {
+          void onSelectFolder()
+        } else if ('path' in file && typeof file.path === 'string') {
+          onVideoDropped(file.path)
+        }
+      } else if (VALID_IMAGE_EXTENSIONS.includes(extension)) {
+        setDropError('Selected file is an image. Please switch to Image mode to upscale images.')
+      } else {
+        setDropError(`Unsupported video format: .${extension}.`)
+      }
     }
   }
 
@@ -132,7 +190,7 @@ export function MainContent({
     }
   }
 
-  const showComparison = !batchMode && Boolean(videoUrl && upscaledVideoUrl)
+  const showComparison = !batchMode && Boolean(mediaUrl && upscaledMediaUrl)
 
   return (
     <div
@@ -143,11 +201,32 @@ export function MainContent({
       onDragLeave={handleDragLeave}
       onDoubleClick={handleDoubleClick}
     >
+      {/* Drop rejection alert */}
+      {dropError && (
+        <div className="absolute top-6 z-50 flex items-center gap-2 rounded-xl border border-destructive/50 bg-destructive/10 px-4 py-2.5 text-xs font-medium text-destructive backdrop-blur-md shadow-lg animate-in fade-in slide-in-from-top-2">
+          <AlertCircle className="size-4 shrink-0" />
+          <span>{dropError}</span>
+          <button
+            type="button"
+            onClick={() => setDropError(null)}
+            className="ml-2 hover:opacity-80 cursor-pointer"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
+
       {isDragging && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-primary/10 backdrop-blur-sm">
           <div className="rounded-2xl border-2 border-dashed border-primary bg-card p-8 text-center shadow-lg">
-            <FileVideo className="mx-auto mb-3 size-10 text-primary" />
-            <p className="text-lg font-medium">Drop video here</p>
+            {upscaleMode === 'image' ? (
+              <FileImage className="mx-auto mb-3 size-10 text-primary" />
+            ) : (
+              <FileVideo className="mx-auto mb-3 size-10 text-primary" />
+            )}
+            <p className="text-lg font-medium">
+              {upscaleMode === 'image' ? 'Drop image here' : 'Drop video here'}
+            </p>
           </div>
         </div>
       )}
@@ -158,35 +237,75 @@ export function MainContent({
           folderPath={folderPath}
           folderVideoCount={folderVideoCount}
           batchMode={batchMode}
+          mode={upscaleMode}
         />
       )}
 
-      {!batchMode && videoUrl && !showComparison && (
+      {/* Single Media Preview */}
+      {!batchMode && mediaUrl && !showComparison && (
         <div className="relative z-10 flex h-full w-full items-center justify-center p-8">
-          <video
-            key={`original-${videoUrl}`}
-            src={videoUrl}
-            controls
-            className="max-h-[70vh] max-w-full rounded-xl border shadow-sm"
-          />
+          {upscaleMode === 'image' ? (
+            <img
+              key={`original-img-${mediaUrl}`}
+              src={mediaUrl}
+              alt={videoName || 'Original Image'}
+              loading="lazy"
+              decoding="async"
+              className="max-h-[70vh] max-w-full rounded-xl border object-contain shadow-sm"
+            />
+          ) : (
+            <video
+              key={`original-vid-${mediaUrl}`}
+              src={mediaUrl}
+              controls
+              className="max-h-[70vh] max-w-full rounded-xl border shadow-sm"
+            />
+          )}
         </div>
       )}
 
+      {/* Comparison View */}
       {showComparison && (
         <div className="relative z-10 flex h-full w-full items-center justify-center p-8">
-          <ReactCompareSlider
-            itemOne={
-              <video src={videoUrl ?? undefined} controls className="h-full w-full rounded-xl" />
-            }
-            itemTwo={
-              <video
-                src={upscaledVideoUrl ?? undefined}
-                controls
-                className="h-full w-full rounded-xl"
-              />
-            }
-            className="max-h-[70vh] max-w-full rounded-xl shadow-sm"
-          />
+          {upscaleMode === 'image' ? (
+            <ReactCompareSlider
+              itemOne={
+                <ReactCompareSliderImage
+                  src={mediaUrl!}
+                  alt="Original"
+                  className="rounded-xl object-contain select-none"
+                  loading="lazy"
+                  decoding="async"
+                  draggable={false}
+                />
+              }
+              itemTwo={
+                <ReactCompareSliderImage
+                  src={upscaledMediaUrl!}
+                  alt="Upscaled"
+                  className="rounded-xl object-contain select-none"
+                  loading="lazy"
+                  decoding="async"
+                  draggable={false}
+                />
+              }
+              className="max-h-[70vh] max-w-full rounded-xl shadow-sm"
+            />
+          ) : (
+            <ReactCompareSlider
+              itemOne={
+                <video src={mediaUrl ?? undefined} controls className="h-full w-full rounded-xl" />
+              }
+              itemTwo={
+                <video
+                  src={upscaledMediaUrl ?? undefined}
+                  controls
+                  className="h-full w-full rounded-xl"
+                />
+              }
+              className="max-h-[70vh] max-w-full rounded-xl shadow-sm"
+            />
+          )}
         </div>
       )}
 
@@ -197,7 +316,8 @@ export function MainContent({
             <p className="max-w-md truncate text-lg font-medium">{folderPath}</p>
             {folderVideoCount > 0 && (
               <p className="text-sm text-muted-foreground">
-                {folderVideoCount} video{folderVideoCount === 1 ? '' : 's'} found
+                {folderVideoCount} {upscaleMode === 'image' ? 'image' : 'video'}
+                {folderVideoCount === 1 ? '' : 's'} found
               </p>
             )}
           </div>
@@ -216,6 +336,7 @@ export function MainContent({
             videoName={videoName}
             folderPath={folderPath}
             folderVideoCount={folderVideoCount}
+            mode={upscaleMode}
           />
         </div>
       )}
@@ -227,8 +348,14 @@ export function MainContent({
           className="absolute bottom-6 right-6 z-20 rounded-full"
           onClick={batchMode ? onSelectFolder : onSelectVideo}
         >
-          {batchMode ? <FolderOpen className="mr-2 size-4" /> : <Film className="mr-2 size-4" />}
-          Change {batchMode ? 'Folder' : 'Video'}
+          {batchMode ? (
+            <FolderOpen className="mr-2 size-4" />
+          ) : upscaleMode === 'image' ? (
+            <ImageIcon className="mr-2 size-4" />
+          ) : (
+            <Film className="mr-2 size-4" />
+          )}
+          Change {batchMode ? 'Folder' : upscaleMode === 'image' ? 'Image' : 'Video'}
         </Button>
       )}
     </div>

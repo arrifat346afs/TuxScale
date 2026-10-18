@@ -29,6 +29,7 @@ type BackendSettingsProps = {
   onPytorchEncoderChange?: (encoder: PyTorchEncoderMode) => void
   pytorchSkipDuplicates?: boolean
   onPytorchSkipDuplicatesChange?: (skipDuplicates: boolean) => void
+  isImageMode?: boolean
 }
 
 const SETUP_COMMANDS = `python3.12 -m venv ~/.venvs/tuxscale
@@ -50,7 +51,8 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
   pytorchEncoder = 'auto',
   onPytorchEncoderChange,
   pytorchSkipDuplicates = true,
-  onPytorchSkipDuplicatesChange
+  onPytorchSkipDuplicatesChange,
+  isImageMode = false
 }) => {
   const [tempPythonPath, setTempPythonPath] = useState(customPythonPath)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -136,8 +138,8 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
             </p>
           </div>
 
-          {/* 2. Video Encoder (shown when PyTorch is active/selected) */}
-          {showPyTorchOptions && (
+          {/* 2. Video Encoder (shown when PyTorch is active/selected and not in image mode) */}
+          {showPyTorchOptions && !isImageMode && (
             <div className="space-y-1.5 pt-1 border-t border-border/50">
               <div className="flex items-center gap-1.5">
                 <Label className="text-xs font-medium">Video Encoder</Label>
@@ -208,8 +210,8 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
             </div>
           )}
 
-          {/* 4. Skip Duplicate Frames */}
-          {showPyTorchOptions && (
+          {/* 4. Skip Duplicate Frames (video-only) */}
+          {showPyTorchOptions && !isImageMode && (
             <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/50">
               <div className="space-y-0.5 min-w-0">
                 <div className="flex items-center gap-1.5">
