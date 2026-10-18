@@ -56,11 +56,28 @@ export type AllEnginesStatus = {
   engines: Record<BackendId, EngineStatus>
 }
 
+export type EngineImageUpscaleOptions = {
+  inputPaths: string[]
+  outputPath?: string
+  model: string
+  scale: string
+  backend?: BackendPreference
+  customPythonPath?: string
+  ttaMode?: boolean
+  tileSize?: number
+  outputFormat?: 'png' | 'jpg' | 'webp' | string
+  outputQuality?: number
+  pytorchLowVram?: boolean
+  onProgress: (data: ProgressData) => void
+  sendLog: (message: string) => void
+}
+
 export interface Engine {
   readonly id: BackendId
   isAvailable(customPythonPath?: string): Promise<boolean>
   getStatus(customPythonPath?: string): Promise<EngineStatus>
   getModels(): string[] | Promise<string[]>
   upscale(options: EngineUpscaleOptions): Promise<string>
+  upscaleImages(options: EngineImageUpscaleOptions): Promise<string[]>
   stop(): void
 }

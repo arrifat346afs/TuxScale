@@ -29,6 +29,12 @@ export function getScriptPath(): string {
     : path.join(process.cwd(), 'resources', 'python', 'tuxscale_upscale.py')
 }
 
+export function getImageScriptPath(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'python', 'tuxscale_upscale_images.py')
+    : path.join(process.cwd(), 'resources', 'python', 'tuxscale_upscale_images.py')
+}
+
 export function findBundledPython(): string | null {
   const isWin = process.platform === 'win32'
   const pyNames = isWin ? ['python.exe'] : ['python3', 'python']
@@ -37,19 +43,25 @@ export function findBundledPython(): string | null {
   // 1. In packaged app, resourcesPath contains python-env
   if (app.isPackaged) {
     for (const name of pyNames) {
-      candidates.push(path.join(process.resourcesPath, 'python-env', isWin ? 'Scripts' : 'bin', name))
+      candidates.push(
+        path.join(process.resourcesPath, 'python-env', isWin ? 'Scripts' : 'bin', name)
+      )
       candidates.push(path.join(process.resourcesPath, 'python-env', name))
     }
   }
 
   // 2. In Flatpak, check /app/tuxscale/resources/python-env
   for (const name of pyNames) {
-    candidates.push(path.join('/app', 'tuxscale', 'resources', 'python-env', isWin ? 'Scripts' : 'bin', name))
+    candidates.push(
+      path.join('/app', 'tuxscale', 'resources', 'python-env', isWin ? 'Scripts' : 'bin', name)
+    )
   }
 
   // 3. In dev / project directory
   for (const name of pyNames) {
-    candidates.push(path.join(process.cwd(), 'resources', 'python-env', isWin ? 'Scripts' : 'bin', name))
+    candidates.push(
+      path.join(process.cwd(), 'resources', 'python-env', isWin ? 'Scripts' : 'bin', name)
+    )
     candidates.push(path.join(process.cwd(), 'resources', 'python-env', name))
   }
 
@@ -171,15 +183,17 @@ export async function detectPyTorch(customPythonPath?: string): Promise<PyTorchD
 
   // 2. Check Script Path
   const scriptPath = getScriptPath()
-  if (fs.existsSync(scriptPath)) {
+  const imageScriptPath = getImageScriptPath()
+  if (fs.existsSync(scriptPath) && fs.existsSync(imageScriptPath)) {
     details.script = {
       ok: true,
-      message: 'Streaming worker script located'
+      message: 'Worker scripts located'
     }
   } else {
+    const missing = !fs.existsSync(scriptPath) ? scriptPath : imageScriptPath
     details.script = {
       ok: false,
-      message: `Worker script not found at ${scriptPath}`,
+      message: `Worker script not found at ${missing}`,
       fixHint: 'Verify the application installation integrity.'
     }
   }
