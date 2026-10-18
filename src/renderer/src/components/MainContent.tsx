@@ -1,12 +1,25 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { FileVideo, Film, FolderOpen, FileImage, ImageIcon, AlertCircle, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  FileVideo,
+  Film,
+  FolderOpen,
+  FileImage,
+  ImageIcon,
+  AlertCircle,
+  X,
+  Loader2,
+  ExternalLink
+} from 'lucide-react'
 import { ReactCompareSlider, ReactCompareSliderImage } from 'react-compare-slider'
 import { Button } from './ui/button'
 import { Tabs, TabsList, TabsTrigger } from './ui/tabs'
 import { ProgressDisplay } from './ProgressDisplay'
 import { IdleDisplay } from './IdleDisplay'
+import { VideoPlayer } from './preview/VideoPlayer'
+import { VideoComparison } from './preview/VideoComparison'
 import type { ProgressData } from '../types'
+import type { PreviewResult, VideoProbeInfo } from '../../../../common/types/types'
 
 const VALID_VIDEO_EXTENSIONS = [
   'mp4',
@@ -73,6 +86,15 @@ export function MainContent({
   const [upscaledMediaUrl, setUpscaledMediaUrl] = useState<string | null>(null)
   const [dropError, setDropError] = useState<string | null>(null)
 
+  // Video preview probing and proxy state
+  const [videoPreview, setVideoPreview] = useState<PreviewResult | null>(null)
+  const [isPreparingPreview, setIsPreparingPreview] = useState(false)
+  const [previewError, setPreviewError] = useState<{
+    message: string
+    info?: VideoProbeInfo
+  } | null>(null)
+  const [upscaledVideoPreview, setUpscaledVideoPreview] = useState<PreviewResult | null>(null)
+
   const showIdle = useMemo(() => {
     if (batchMode) return folderPath === null
     return videoPath === null
@@ -85,57 +107,84 @@ export function MainContent({
     return (): void => clearTimeout(timer)
   }, [dropError])
 
+  // Load video preview with probe / proxy fallback
+  const loadVideoPreview = useCallback(async (path: string, forceProxy = false): Promise<void> => {
+    setIsPreparingPreview(true)
+    setPreviewError(null)
+    try {
+      const result = await window.api.getPreviewUrl({ videoPath: path, forceProxy })
+      setVideoPreview(result)
+      setIsPreparingPreview(false)
+    } catch (err) {
+      console.error('Failed to get video preview:', err)
+      setIsPreparingPreview(false)
+      setPreviewError({
+        message: err instanceof Error ? err.message : 'Failed to prepare video preview'
+      })
+    }
+  }, [])
+
+  const handleCancelPreview = async (): Promise<void> => {
+    if (videoPath) {
+      await window.api.cancelPreview(videoPath)
+    }
+    setIsPreparingPreview(false)
+  }
+
+  // Handle active input path change
   useEffect(() => {
     if (!videoPath) {
       setMediaUrl(null)
-      return
-    }
-    if (
-      videoPath.startsWith('http://') ||
-      videoPath.startsWith('https://') ||
-      videoPath.startsWith('local-file://')
-    ) {
-      setMediaUrl(videoPath)
+      setVideoPreview(null)
+      setPreviewError(null)
+      setIsPreparingPreview(false)
       return
     }
 
     if (upscaleMode === 'image') {
+      if (
+        videoPath.startsWith('http://') ||
+        videoPath.startsWith('https://') ||
+        videoPath.startsWith('local-file://')
+      ) {
+        setMediaUrl(videoPath)
+        return
+      }
       window.api
         .getImageUrl(videoPath)
         .then(setMediaUrl)
         .catch(() => setMediaUrl(null))
     } else {
-      window.api
-        .getVideoUrl(videoPath)
-        .then(setMediaUrl)
-        .catch(() => setMediaUrl(null))
+      void loadVideoPreview(videoPath)
     }
-  }, [videoPath, upscaleMode])
+  }, [videoPath, upscaleMode, loadVideoPreview])
 
+  // Handle upscaled output path change
   useEffect(() => {
     if (!upscaledVideoPath) {
       setUpscaledMediaUrl(null)
-      return
-    }
-    if (
-      upscaledVideoPath.startsWith('http://') ||
-      upscaledVideoPath.startsWith('https://') ||
-      upscaledVideoPath.startsWith('local-file://')
-    ) {
-      setUpscaledMediaUrl(upscaledVideoPath)
+      setUpscaledVideoPreview(null)
       return
     }
 
     if (upscaleMode === 'image') {
+      if (
+        upscaledVideoPath.startsWith('http://') ||
+        upscaledVideoPath.startsWith('https://') ||
+        upscaledVideoPath.startsWith('local-file://')
+      ) {
+        setUpscaledMediaUrl(upscaledVideoPath)
+        return
+      }
       window.api
         .getImageUrl(upscaledVideoPath)
         .then(setUpscaledMediaUrl)
         .catch(() => setUpscaledMediaUrl(null))
     } else {
       window.api
-        .getVideoUrl(upscaledVideoPath)
-        .then(setUpscaledMediaUrl)
-        .catch(() => setUpscaledMediaUrl(null))
+        .getPreviewUrl({ videoPath: upscaledVideoPath })
+        .then(setUpscaledVideoPreview)
+        .catch(console.error)
     }
   }, [upscaledVideoPath, upscaleMode])
 
@@ -306,7 +355,9 @@ export function MainContent({
     }
   }
 
-  const showComparison = !batchMode && Boolean(mediaUrl && upscaledMediaUrl)
+  const showComparison =
+    !batchMode &&
+    Boolean(upscaleMode === 'image' ? mediaUrl && upscaledMediaUrl : videoPath && upscaledVideoPath)
 
   return (
     <div
@@ -391,9 +442,9 @@ export function MainContent({
       )}
 
       {/* Single Media Preview */}
-      {!batchMode && mediaUrl && !showComparison && (
+      {!batchMode && !showComparison && (
         <div className="relative z-10 flex h-full w-full items-center justify-center p-8">
-          {upscaleMode === 'image' ? (
+          {upscaleMode === 'image' && mediaUrl ? (
             <img
               key={`original-img-${mediaUrl}`}
               src={mediaUrl}
@@ -402,14 +453,90 @@ export function MainContent({
               decoding="async"
               className="max-h-[70vh] max-w-full rounded-xl border object-contain shadow-sm"
             />
-          ) : (
-            <video
-              key={`original-vid-${mediaUrl}`}
-              src={mediaUrl}
-              controls
-              className="max-h-[70vh] max-w-full rounded-xl border shadow-sm"
-            />
-          )}
+          ) : upscaleMode === 'video' && videoPath ? (
+            isPreparingPreview ? (
+              <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-border/40 bg-card/90 p-8 shadow-md backdrop-blur-md">
+                <Loader2 className="size-8 animate-spin text-primary" />
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-foreground">Preparing preview...</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Generating an H.264 proxy for smooth playback...
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancelPreview}
+                  className="mt-1 cursor-pointer"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : previewError ? (
+              <div className="flex max-w-md flex-col items-center gap-4 rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center shadow-lg backdrop-blur-md">
+                <AlertCircle className="size-10 text-destructive shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-destructive">
+                    Unable to preview video in app
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {previewError.message ||
+                      'This video codec or format cannot be decoded by the internal player.'}
+                  </p>
+                </div>
+                {previewError.info && (
+                  <div className="w-full rounded-xl bg-background/50 border border-border/40 p-3 text-left text-xs font-mono space-y-1">
+                    <div>
+                      <span className="text-muted-foreground">Codec:</span>{' '}
+                      {previewError.info.codec_name}
+                      {previewError.info.profile ? ` (${previewError.info.profile})` : ''}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Pixel Format:</span>{' '}
+                      {previewError.info.pix_fmt}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Resolution:</span>{' '}
+                      {previewError.info.width}x{previewError.info.height}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Frame Rate:</span>{' '}
+                      {previewError.info.fps.toFixed(2)} fps
+                    </div>
+                  </div>
+                )}
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="gap-1.5 cursor-pointer"
+                  onClick={() => window.api.openPath(videoPath)}
+                >
+                  <ExternalLink className="size-3.5" />
+                  Open in system player
+                </Button>
+              </div>
+            ) : videoPreview ? (
+              <VideoPlayer
+                src={videoPreview.url}
+                videoName={videoName}
+                info={videoPreview.info}
+                kind={videoPreview.kind}
+                truncated={videoPreview.truncated}
+                onError={() => {
+                  if (videoPreview.kind === 'native') {
+                    // Fall back to generating proxy
+                    void loadVideoPreview(videoPath, true)
+                  } else {
+                    setPreviewError({
+                      message: 'Internal player failed to decode proxy stream.',
+                      info: videoPreview.info
+                    })
+                  }
+                }}
+                onOpenInSystemPlayer={() => window.api.openPath(videoPath)}
+              />
+            ) : null
+          ) : null}
         </div>
       )}
 
@@ -441,18 +568,12 @@ export function MainContent({
               className="max-h-[70vh] max-w-full rounded-xl shadow-sm"
             />
           ) : (
-            <ReactCompareSlider
-              itemOne={
-                <video src={mediaUrl ?? undefined} controls className="h-full w-full rounded-xl" />
-              }
-              itemTwo={
-                <video
-                  src={upscaledMediaUrl ?? undefined}
-                  controls
-                  className="h-full w-full rounded-xl"
-                />
-              }
-              className="max-h-[70vh] max-w-full rounded-xl shadow-sm"
+            <VideoComparison
+              originalPath={videoPath!}
+              upscaledPath={upscaledVideoPath!}
+              duration={videoPreview?.info.duration || upscaledVideoPreview?.info.duration}
+              videoName={videoName}
+              onOpenInSystemPlayer={() => window.api.openPath(upscaledVideoPath!)}
             />
           )}
         </div>

@@ -52,7 +52,11 @@ const ELECTRON_COMMANDS = {
   INSTALL_PYTORCH_ENV: 'Install PyTorch CUDA Environment',
   CANCEL_PYTORCH_INSTALL: 'Cancel PyTorch CUDA Environment Installation',
   PYTORCH_INSTALL_PROGRESS: 'PyTorch CUDA Environment Installation Progress',
-  INSPECT_PATH: 'Inspect file or directory path'
+  INSPECT_PATH: 'Inspect file or directory path',
+  GET_PREVIEW_URL: 'Get video preview URL and metadata',
+  CANCEL_PREVIEW: 'Cancel video preview generation',
+  GET_FRAME_URL: 'Get video frame URL',
+  OPEN_PATH: 'Open path in system player or file manager'
 } as const
 
 export { ELECTRON_COMMANDS }

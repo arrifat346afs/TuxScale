@@ -2,7 +2,6 @@ import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import path, { join } from 'path'
 import fs from 'fs'
-import http from 'http'
 import os from 'os'
 import { execFile } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -17,110 +16,14 @@ import {
   type UpscaleImageFolderOptions
 } from './image-upscale'
 import { getVideoFiles } from './video-utils'
-import { isImageFile, getImageFiles, IMAGE_MIME_TYPES } from './engines/shared/image-output'
+import { getImageFiles } from './engines/shared/image-output'
 import { getAllEnginesStatus, getEngine, stopAllEngines, type BackendPreference } from './engines'
 import { installPyTorchEnv, cancelPyTorchInstall } from './engines/pytorch/installer'
+import { getVideoUrl, getImageUrl, getFrameUrl, allowPath, stopMediaServer } from './media-server'
+import { probeVideo, isSafeNative } from './preview/probe'
+import { generateProxy, cancelProxy } from './preview/proxy'
 
 let mainWindow: BrowserWindow | null = null
-
-function getMimeType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase()
-  const mimeTypes: Record<string, string> = {
-    '.mp4': 'video/mp4',
-    '.webm': 'video/webm',
-    '.mkv': 'video/x-matroska',
-    '.avi': 'video/x-msvideo',
-    '.mov': 'video/quicktime',
-    '.m4v': 'video/x-m4v',
-    '.wmv': 'video/x-ms-wmv',
-    '.flv': 'video/x-flv',
-    '.mpeg': 'video/mpeg',
-    '.mpg': 'video/mpeg',
-    '.ts': 'video/mp2t'
-  }
-  return mimeTypes[ext] ?? 'application/octet-stream'
-}
-
-let videoServer: http.Server | null = null
-let videoServerPort = 0
-
-function startVideoServer(): Promise<number> {
-  if (videoServer && videoServerPort > 0) {
-    return Promise.resolve(videoServerPort)
-  }
-  return new Promise((resolve, reject) => {
-    const server = http.createServer((req, res) => {
-      try {
-        const reqUrl = new URL(req.url ?? '/', `http://127.0.0.1:${videoServerPort}`)
-
-        if (reqUrl.pathname === '/image') {
-          const filePath = reqUrl.searchParams.get('path') ?? ''
-          if (!filePath || !fs.existsSync(filePath) || !isImageFile(filePath)) {
-            res.writeHead(404).end('Not found')
-            return
-          }
-          const ext = path.extname(filePath).toLowerCase()
-          const mimeType = IMAGE_MIME_TYPES[ext] ?? 'application/octet-stream'
-          const stat = fs.statSync(filePath)
-          res.writeHead(200, {
-            'Content-Length': String(stat.size),
-            'Content-Type': mimeType,
-            'Cache-Control': 'no-cache'
-          })
-          fs.createReadStream(filePath).pipe(res)
-          return
-        }
-
-        if (reqUrl.pathname !== '/video') {
-          res.writeHead(404).end('Not found')
-          return
-        }
-        const filePath = reqUrl.searchParams.get('path') ?? ''
-        if (!filePath || !fs.existsSync(filePath)) {
-          res.writeHead(404).end('Not found')
-          return
-        }
-        const stat = fs.statSync(filePath)
-        const mimeType = getMimeType(filePath)
-        const range = req.headers.range
-        if (range) {
-          const parts = range.replace(/bytes=/, '').split('-')
-          const start = parseInt(parts[0], 10)
-          const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1
-          if (isNaN(start) || isNaN(end) || start >= stat.size || end >= stat.size || start > end) {
-            res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` }).end()
-            return
-          }
-          const chunksize = end - start + 1
-          res.writeHead(206, {
-            'Content-Range': `bytes ${start}-${end}/${stat.size}`,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': String(chunksize),
-            'Content-Type': mimeType
-          })
-          fs.createReadStream(filePath, { start, end }).pipe(res)
-        } else {
-          res.writeHead(200, {
-            'Accept-Ranges': 'bytes',
-            'Content-Length': String(stat.size),
-            'Content-Type': mimeType
-          })
-          fs.createReadStream(filePath).pipe(res)
-        }
-      } catch (error) {
-        console.error('Video server error', error)
-        if (!res.headersSent) res.writeHead(500).end('Internal server error')
-      }
-    })
-    server.listen(0, '127.0.0.1', () => {
-      const addr = server.address()
-      videoServerPort = typeof addr === 'object' && addr ? addr.port : 0
-      videoServer = server
-      resolve(videoServerPort)
-    })
-    server.on('error', reject)
-  })
-}
 
 function createWindow(): void {
   const icon = app.isPackaged
@@ -180,6 +83,7 @@ function registerIpcHandlers(): void {
       ]
     })
     if (result.canceled) return null
+    allowPath(result.filePaths[0])
     return result.filePaths[0]
   })
 
@@ -188,12 +92,12 @@ function registerIpcHandlers(): void {
       properties: ['openDirectory']
     })
     if (result.canceled) return null
+    allowPath(result.filePaths[0])
     return result.filePaths[0]
   })
 
   ipcMain.handle(ELECTRON_COMMANDS.GET_VIDEO_URL, async (_, videoPath: string) => {
-    const port = await startVideoServer()
-    return `http://127.0.0.1:${port}/video?path=${encodeURIComponent(videoPath)}`
+    return getVideoUrl(videoPath)
   })
 
   ipcMain.handle(ELECTRON_COMMANDS.UPSCAYL_VIDEO, async (event, payload) => {
@@ -308,6 +212,7 @@ function registerIpcHandlers(): void {
       ]
     })
     if (result.canceled) return null
+    allowPath(result.filePaths[0])
     return result.filePaths[0]
   })
 
@@ -316,12 +221,12 @@ function registerIpcHandlers(): void {
       properties: ['openDirectory']
     })
     if (result.canceled) return null
+    allowPath(result.filePaths[0])
     return result.filePaths[0]
   })
 
   ipcMain.handle(ELECTRON_COMMANDS.GET_IMAGE_URL, async (_, imagePath: string) => {
-    const port = await startVideoServer()
-    return `http://127.0.0.1:${port}/image?path=${encodeURIComponent(imagePath)}`
+    return getImageUrl(imagePath)
   })
 
   ipcMain.handle(ELECTRON_COMMANDS.GET_FOLDER_IMAGES, async (_, folderPath: string) => {
@@ -684,6 +589,7 @@ function registerUpdateHandlers(): void {
       if (!fs.existsSync(targetPath)) {
         return { exists: false, isDirectory: false, isFile: false, name: '', ext: '' }
       }
+      allowPath(targetPath)
       const stat = fs.statSync(targetPath)
       const name = path.basename(targetPath)
       const ext = path.extname(targetPath).slice(1).toLowerCase()
@@ -697,6 +603,42 @@ function registerUpdateHandlers(): void {
     } catch {
       return { exists: false, isDirectory: false, isFile: false, name: '', ext: '' }
     }
+  })
+
+  ipcMain.handle(
+    ELECTRON_COMMANDS.GET_PREVIEW_URL,
+    async (_, payload: { videoPath: string; forceProxy?: boolean }) => {
+      const { videoPath, forceProxy } = payload
+      allowPath(videoPath)
+      const info = await probeVideo(videoPath)
+      const ext = path.extname(videoPath).toLowerCase()
+      if (!forceProxy && isSafeNative(info, ext)) {
+        const url = await getVideoUrl(videoPath)
+        return { url, kind: 'native', info, truncated: false }
+      }
+      const { proxyPath, truncated } = await generateProxy(videoPath, info.duration)
+      allowPath(proxyPath)
+      const url = await getVideoUrl(proxyPath)
+      return { url, kind: 'proxy', info, truncated }
+    }
+  )
+
+  ipcMain.handle(ELECTRON_COMMANDS.CANCEL_PREVIEW, async (_, videoPath: string) => {
+    cancelProxy(videoPath)
+  })
+
+  ipcMain.handle(
+    ELECTRON_COMMANDS.GET_FRAME_URL,
+    async (_, payload: { videoPath: string; timestamp: number }) => {
+      allowPath(payload.videoPath)
+      return getFrameUrl(payload.videoPath, payload.timestamp)
+    }
+  )
+
+  ipcMain.handle(ELECTRON_COMMANDS.OPEN_PATH, async (_, targetPath: string) => {
+    if (!targetPath) return 'Invalid path'
+    allowPath(targetPath)
+    return shell.openPath(targetPath)
   })
 }
 
@@ -725,6 +667,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('will-quit', () => {
+  stopMediaServer()
 })
 
 // In this file you can include the rest of your app's specific main process

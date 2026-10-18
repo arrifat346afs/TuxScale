@@ -152,3 +152,20 @@ export type BatchUpscaylPayload = {
   ttaMode: boolean
   copyMetadata: boolean
 }
+
+export type VideoProbeInfo = {
+  codec_name: string
+  profile?: string
+  pix_fmt: string
+  width: number
+  height: number
+  fps: number
+  duration: number
+}
+
+export type PreviewResult = {
+  url: string
+  kind: 'native' | 'proxy'
+  info: VideoProbeInfo
+  truncated: boolean
+}

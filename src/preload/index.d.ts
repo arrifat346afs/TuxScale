@@ -5,7 +5,8 @@ import type {
   VideoUpscaylPayload,
   FolderUpscaylPayload,
   ImageUpscalePayload,
-  FolderImageUpscalePayload
+  FolderImageUpscalePayload,
+  PreviewResult
 } from '../../common/types/types'
 
 interface Api {
@@ -30,6 +31,10 @@ interface Api {
   getFolderImages: (folderPath: string) => Promise<string[]>
   getVideoUrl: (videoPath: string) => Promise<string>
   getImageUrl: (imagePath: string) => Promise<string>
+  getPreviewUrl: (payload: { videoPath: string; forceProxy?: boolean }) => Promise<PreviewResult>
+  cancelPreview: (videoPath: string) => Promise<void>
+  getFrameUrl: (videoPath: string, timestamp: number) => Promise<string>
+  openPath: (targetPath: string) => Promise<string>
   upscaleVideo: (payload: VideoUpscaylPayload) => Promise<void>
   upscaleFolder: (payload: FolderUpscaylPayload) => Promise<void>
   upscaleImage: (payload: ImageUpscalePayload) => Promise<void>

@@ -43,6 +43,17 @@ const api = {
   getImageUrl: (imagePath: string) =>
     ipcRenderer.invoke(ELECTRON_COMMANDS.GET_IMAGE_URL, imagePath),
 
+  getPreviewUrl: (payload: { videoPath: string; forceProxy?: boolean }) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.GET_PREVIEW_URL, payload),
+
+  cancelPreview: (videoPath: string) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.CANCEL_PREVIEW, videoPath),
+
+  getFrameUrl: (videoPath: string, timestamp: number) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.GET_FRAME_URL, { videoPath, timestamp }),
+
+  openPath: (targetPath: string) => ipcRenderer.invoke(ELECTRON_COMMANDS.OPEN_PATH, targetPath),
+
   upscaleVideo: (payload: {
     videoPath: string
     outputPath?: string
