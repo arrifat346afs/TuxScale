@@ -102,12 +102,53 @@ else
   echo "Model weights already present at: $WEIGHTS_PATH"
 fi
 
-# 7. Clean up unneeded files to minimize package size
+# 7. Aggressively clean up unneeded files and libraries to minimize package size
 echo "==> Cleaning unneeded files to optimize package size..."
+
+# Remove unused NVIDIA CUDA 12 packages (not required for Real-ESRGAN/Spandrel vision CNN & transformer inference)
+# - nccl: multi-GPU distributed training (~350MB)
+# - cusparse: sparse matrix operations (~450MB)
+# - cusolver: dense linear solvers (~350MB)
+# - cufft: fast Fourier transforms (~400MB)
+# - curand: random number generation (~150MB)
+# - cupti: profiling tools (~50MB)
+# - triton: JIT compiler for torch.compile (~200MB)
+# - libcudnn_adv: recurrent neural networks (~200MB)
+rm -rf "$SITE_PACKAGES/nvidia/nccl" "$SITE_PACKAGES/nvidia_nccl_cu12"* 2>/dev/null || true
+rm -rf "$SITE_PACKAGES/nvidia/cusparse" "$SITE_PACKAGES/nvidia_cusparse_cu12"* 2>/dev/null || true
+rm -rf "$SITE_PACKAGES/nvidia/cusolver" "$SITE_PACKAGES/nvidia_cusolver_cu12"* 2>/dev/null || true
+rm -rf "$SITE_PACKAGES/nvidia/cufft" "$SITE_PACKAGES/nvidia_cufft_cu12"* 2>/dev/null || true
+rm -rf "$SITE_PACKAGES/nvidia/curand" "$SITE_PACKAGES/nvidia_curand_cu12"* 2>/dev/null || true
+rm -rf "$SITE_PACKAGES/nvidia/cupti" "$SITE_PACKAGES/nvidia_cuda_cupti_cu12"* 2>/dev/null || true
+rm -rf "$SITE_PACKAGES/nvidia/cudnn/lib/libcudnn_adv.so"* 2>/dev/null || true
+rm -rf "$SITE_PACKAGES/triton"* 2>/dev/null || true
+
+# Remove C++ headers, test fixtures, documentation, and unused binaries
 rm -rf "$TARGET_DIR/include"
 rm -rf "$TARGET_DIR/share"
-find "$TARGET_DIR" -name "*.a" -type f -delete || true
+rm -rf "$SITE_PACKAGES/torch/include"
+rm -rf "$SITE_PACKAGES/torch/test"
+rm -rf "$SITE_PACKAGES/torch/bin"
+rm -rf "$SITE_PACKAGES/torch/share"
+
+find "$TARGET_DIR" -name "*.a" -type f -delete 2>/dev/null || true
 find "$TARGET_DIR" -type d \( -name "tests" -o -name "test" \) -prune -exec rm -rf {} + 2>/dev/null || true
 find "$TARGET_DIR" -type d -name "__pycache__" -prune -exec rm -rf {} + 2>/dev/null || true
+find "$TARGET_DIR" -name "*.pyc" -type f -delete 2>/dev/null || true
+find "$TARGET_DIR" -name "*.pyo" -type f -delete 2>/dev/null || true
 
-echo "✓ Bundled Python environment ready at: $TARGET_DIR"
+# Strip debug symbols from shared libraries
+if command -v strip >/dev/null 2>&1; then
+  echo "==> Stripping debug symbols from shared libraries..."
+  find "$TARGET_DIR" -type f -name "*.so*" -exec strip --strip-unneeded {} + 2>/dev/null || true
+fi
+
+# 8. Re-verify environment functionality after pruning
+echo "==> Re-verifying bundled Python environment after pruning..."
+"$PYTHON_BIN" -c "import torch, torchvision, realesrgan, basicsr, spandrel, numpy; print('✓ Post-pruning verification passed: Torch', torch.__version__, '| CUDA:', torch.version.cuda)"
+"$PYTHON_BIN" -c "from basicsr.data.degradations import rgb_to_grayscale; print('✓ Post-pruning BasicSR degradations verified')"
+"$PYTHON_BIN" -c "from spandrel import ModelLoader; print('✓ Post-pruning Spandrel ModelLoader verified')"
+"$PYTHON_BIN" "$ROOT_DIR/resources/python/tuxscale_upscale.py" --help > /dev/null
+echo "✓ Post-pruning tuxscale_upscale.py execution verified"
+
+echo "✓ Bundled Python environment optimized and ready at: $TARGET_DIR"

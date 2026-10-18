@@ -72,7 +72,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tuxscale-linux
-          path: dist/*
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+            dist/*.pacman
+            dist/*.yml
+            dist/*.yaml
+          if-no-files-found: error
 
   release:
     name: Publish GitHub Release
@@ -90,13 +97,54 @@ jobs:
           name: tuxscale-linux
           path: release-assets
 
-      - name: List release assets
-        run: ls -la release-assets
+      - name: Prepare and check release asset sizes (split if >= 2GB)
+        run: |
+          set -euo pipefail
+          echo "==> Inspecting release assets before release upload..."
+          ls -lh release-assets
+
+          # GitHub Release Asset limit is strictly 2 GiB (2,147,483,648 bytes)
+          # Use 2000 MB (2,097,152,000 bytes) threshold to ensure a safe margin
+          MAX_BYTES=2097152000
+          SPLIT_OCCURRED=0
+
+          for f in release-assets/*; do
+            [ -f "$f" ] || continue
+            size=$(stat -c%s "$f")
+            base=$(basename "$f")
+
+            if [ "$size" -gt "$MAX_BYTES" ]; then
+              echo "⚠️  Asset $base ($size bytes) exceeds GitHub 2 GiB limit. Splitting into 1900MB chunks..."
+              split -b 1900M --numeric-suffixes=1 "$f" "${f}.part"
+              rm -f "$f"
+              SPLIT_OCCURRED=1
+              echo "✓ Split $base into chunks:"
+              ls -lh "${f}.part"*
+            else
+              echo "✓ Asset $base ($size bytes) is well within GitHub 2 GiB limit."
+            fi
+          done
+
+          if [ "$SPLIT_OCCURRED" -eq 1 ]; then
+            cat << 'EOF' > release-assets/HOW_TO_JOIN_SPLIT_ASSETS.txt
+To rejoin any multi-part release asset (e.g. .part01, .part02):
+
+Linux / macOS:
+  cat <filename>.part* > <filename>
+  chmod +x <filename>   # if AppImage
+
+Windows (Command Prompt):
+  copy /b <filename>.part01 + <filename>.part02 <filename>
+EOF
+          fi
+
+          echo "==> Final list of release assets to upload:"
+          ls -lh release-assets
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.build-linux.outputs.version }}
-          release_name: TuxScale v${{ needs.build-linux.outputs.version }}
+          name: TuxScale v${{ needs.build-linux.outputs.version }}
           files: release-assets/*
           generate_release_notes: true

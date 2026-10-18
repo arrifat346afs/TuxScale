@@ -31,9 +31,9 @@ linux:
     - deb
     - rpm
     - pacman
-    - zip
   maintainer: TuxScale
   category: Utility
+compression: maximum
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
