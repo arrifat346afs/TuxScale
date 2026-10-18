@@ -20,7 +20,7 @@ import {
 } from './runner'
 import { getVideoFps, getFrameCount } from '../shared/ffmpeg'
 import { resolveOutputPath, AUDIO_FORMATS } from '../shared/output'
-import { resolveImageOutputPath } from '../shared/image-output'
+import { resolveImageOutputPath, moveFileSafe } from '../shared/image-output'
 import { getModel } from '../../getmodel'
 
 export class NcnnEngine implements Engine {
@@ -199,10 +199,10 @@ export class NcnnEngine implements Engine {
       options.outputQuality !== undefined
         ? format === 'png'
           ? Math.max(0, Math.min(9, Math.round(options.outputQuality / 10)))
-          : options.outputQuality
+          : Math.max(0, Math.min(100, 100 - options.outputQuality))
         : format === 'png'
           ? 0
-          : 95
+          : 5
 
     sendLog(
       `[NCNN] Starting image upscale with model '${model}', scale ${scale}x, format ${format}`
@@ -256,7 +256,7 @@ export class NcnnEngine implements Engine {
         }
 
         fs.mkdirSync(path.dirname(finalOutputPath), { recursive: true })
-        fs.renameSync(tempOutputFile, finalOutputPath)
+        moveFileSafe(tempOutputFile, finalOutputPath)
 
         onProgress({
           current: 1,
@@ -356,6 +356,7 @@ export class NcnnEngine implements Engine {
 
       // Move generated files to target destinations
       const resultPaths: string[] = []
+      const reservedPaths = new Set<string>()
       let failedCount = 0
 
       for (let i = 0; i < mapping.length; i++) {
@@ -364,9 +365,15 @@ export class NcnnEngine implements Engine {
         const generatedCandidate = path.join(outDir, `${baseStaged}.${format}`)
 
         if (fs.existsSync(generatedCandidate)) {
-          const targetFinal = resolveImageOutputPath(originalPath, options.outputPath, format)
+          const targetFinal = resolveImageOutputPath(
+            originalPath,
+            options.outputPath,
+            format,
+            reservedPaths
+          )
+          reservedPaths.add(targetFinal)
           fs.mkdirSync(path.dirname(targetFinal), { recursive: true })
-          fs.renameSync(generatedCandidate, targetFinal)
+          moveFileSafe(generatedCandidate, targetFinal)
           resultPaths.push(targetFinal)
         } else {
           failedCount++

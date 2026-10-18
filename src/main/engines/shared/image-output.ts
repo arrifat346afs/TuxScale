@@ -50,7 +50,8 @@ export function getImageFiles(folderPath: string): string[] {
 export function resolveImageOutputPath(
   inputPath: string,
   outputPath?: string,
-  outputFormat: string = 'png'
+  outputFormat: string = 'png',
+  reservedPaths?: Set<string>
 ): string {
   const targetExt = `.${outputFormat.toLowerCase().replace(/^\./, '')}`
   const baseName = path.basename(inputPath, path.extname(inputPath))
@@ -71,9 +72,23 @@ export function resolveImageOutputPath(
     // Ignore
   }
 
+  const isAvailable = (candidatePath: string): boolean => {
+    if (reservedPaths && reservedPaths.has(candidatePath)) {
+      return false
+    }
+    if (fs.existsSync(candidatePath)) {
+      return false
+    }
+    if (path.resolve(candidatePath) === path.resolve(inputPath)) {
+      return false
+    }
+    return true
+  }
+
   // 1. Try <baseName>_upscaled.<ext>
   let candidate = path.join(targetDir, `${baseName}_upscaled${targetExt}`)
-  if (!fs.existsSync(candidate) && path.resolve(candidate) !== path.resolve(inputPath)) {
+  if (isAvailable(candidate)) {
+    reservedPaths?.add(candidate)
     return candidate
   }
 
@@ -81,9 +96,32 @@ export function resolveImageOutputPath(
   let counter = 1
   while (true) {
     candidate = path.join(targetDir, `${baseName}_upscaled_${counter}${targetExt}`)
-    if (!fs.existsSync(candidate) && path.resolve(candidate) !== path.resolve(inputPath)) {
+    if (isAvailable(candidate)) {
+      reservedPaths?.add(candidate)
       return candidate
     }
     counter++
+  }
+}
+
+/**
+ * Moves a file safely across filesystems.
+ * Falls back to copyFileSync + unlinkSync only when fs.renameSync throws EXDEV.
+ */
+export function moveFileSafe(src: string, dest: string): void {
+  try {
+    fs.renameSync(src, dest)
+  } catch (err: unknown) {
+    if (
+      err &&
+      typeof err === 'object' &&
+      'code' in err &&
+      (err as { code: string }).code === 'EXDEV'
+    ) {
+      fs.copyFileSync(src, dest)
+      fs.unlinkSync(src)
+    } else {
+      throw err
+    }
   }
 }

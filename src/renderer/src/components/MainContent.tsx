@@ -157,8 +157,13 @@ export function MainContent({
       if (VALID_IMAGE_EXTENSIONS.includes(extension)) {
         if (batchMode) {
           void onSelectFolder()
-        } else if ('path' in file && typeof file.path === 'string') {
-          onVideoDropped(file.path)
+        } else {
+          const filePath = window.api.getPathForFile(file)
+          if (filePath) {
+            onVideoDropped(filePath)
+          } else {
+            setDropError('Unable to resolve path for the dropped image.')
+          }
         }
       } else if (VALID_VIDEO_EXTENSIONS.includes(extension)) {
         setDropError('Selected file is a video. Please switch to Video mode to upscale videos.')
@@ -171,8 +176,13 @@ export function MainContent({
       if (VALID_VIDEO_EXTENSIONS.includes(extension)) {
         if (batchMode) {
           void onSelectFolder()
-        } else if ('path' in file && typeof file.path === 'string') {
-          onVideoDropped(file.path)
+        } else {
+          const filePath = window.api.getPathForFile(file)
+          if (filePath) {
+            onVideoDropped(filePath)
+          } else {
+            setDropError('Unable to resolve path for the dropped video.')
+          }
         }
       } else if (VALID_IMAGE_EXTENSIONS.includes(extension)) {
         setDropError('Selected file is an image. Please switch to Image mode to upscale images.')

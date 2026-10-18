@@ -176,7 +176,7 @@ export function runUpscaylBinImage(options: {
       '-f',
       options.format,
       '-c',
-      String(options.compression ?? (options.format === 'png' ? 0 : 95))
+      String(options.compression ?? (options.format === 'png' ? 0 : 5))
     ]
 
     if (options.ttaMode) args.push('-x')

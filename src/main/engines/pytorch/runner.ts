@@ -348,10 +348,13 @@ export class PyTorchEngine implements Engine {
     const format = outputFormat === 'jpeg' ? 'jpg' : outputFormat
     const quality = outputQuality ?? 95
 
-    // Resolve non-overwriting output paths for all input files
-    const resolvedOutputs = inputPaths.map((p) =>
-      resolveImageOutputPath(p, options.outputPath, format)
-    )
+    // Resolve non-overwriting distinct output paths for all input files
+    const reservedPaths = new Set<string>()
+    const resolvedOutputs = inputPaths.map((p) => {
+      const out = resolveImageOutputPath(p, options.outputPath, format, reservedPaths)
+      reservedPaths.add(out)
+      return out
+    })
     this.currentPartialFiles = [...resolvedOutputs]
 
     const total = inputPaths.length

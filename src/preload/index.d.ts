@@ -9,6 +9,7 @@ import type {
 } from '../../common/types/types'
 
 interface Api {
+  getPathForFile: (file: File) => string
   getModelsList: (backend?: string) => Promise<string[]>
   getEngineStatus: (payload?: {
     preference?: string

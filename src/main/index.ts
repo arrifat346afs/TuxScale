@@ -53,7 +53,7 @@ function startVideoServer(): Promise<number> {
         const reqUrl = new URL(req.url ?? '/', `http://127.0.0.1:${videoServerPort}`)
 
         if (reqUrl.pathname === '/image') {
-          const filePath = decodeURIComponent(reqUrl.searchParams.get('path') ?? '')
+          const filePath = reqUrl.searchParams.get('path') ?? ''
           if (!filePath || !fs.existsSync(filePath) || !isImageFile(filePath)) {
             res.writeHead(404).end('Not found')
             return
@@ -74,7 +74,7 @@ function startVideoServer(): Promise<number> {
           res.writeHead(404).end('Not found')
           return
         }
-        const filePath = decodeURIComponent(reqUrl.searchParams.get('path') ?? '')
+        const filePath = reqUrl.searchParams.get('path') ?? ''
         if (!filePath || !fs.existsSync(filePath)) {
           res.writeHead(404).end('Not found')
           return

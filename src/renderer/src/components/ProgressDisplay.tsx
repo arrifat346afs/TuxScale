@@ -78,6 +78,8 @@ export const ProgressDisplay = ({
   useEffect(() => {
     if (!isProcessing || isDone) return
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setElapsedSeconds(0)
     startTimeRef.current = Date.now()
     const interval = setInterval(() => {
       if (startTimeRef.current) {
@@ -87,7 +89,6 @@ export const ProgressDisplay = ({
 
     return (): void => {
       clearInterval(interval)
-      setElapsedSeconds(0)
     }
   }, [isProcessing, isDone])
 

@@ -130,6 +130,7 @@ def save_upscaled_image(
 
     temp_path = f"{output_path}.tmp.{fmt}"
     try:
+        write_ok = False
         if fmt == 'jpg':
             # JPEG cannot store alpha channel; blend alpha over white background if present
             if alpha is not None:
@@ -139,25 +140,27 @@ def save_upscaled_image(
                 to_save = np.clip(blended, 0, 255).astype(np.uint8)
             else:
                 to_save = bgr
-            cv2.imwrite(temp_path, to_save, [cv2.IMWRITE_JPEG_QUALITY, int(quality)])
+            write_ok = cv2.imwrite(temp_path, to_save, [cv2.IMWRITE_JPEG_QUALITY, int(quality)])
 
         elif fmt == 'webp':
             if alpha is not None:
                 bgra = np.dstack([bgr, alpha])
-                cv2.imwrite(temp_path, bgra, [cv2.IMWRITE_WEBP_QUALITY, int(quality)])
+                write_ok = cv2.imwrite(temp_path, bgra, [cv2.IMWRITE_WEBP_QUALITY, int(quality)])
             else:
-                cv2.imwrite(temp_path, bgr, [cv2.IMWRITE_WEBP_QUALITY, int(quality)])
+                write_ok = cv2.imwrite(temp_path, bgr, [cv2.IMWRITE_WEBP_QUALITY, int(quality)])
 
         else:
             # Default to PNG
             if alpha is not None:
                 bgra = np.dstack([bgr, alpha])
-                cv2.imwrite(temp_path, bgra, [cv2.IMWRITE_PNG_COMPRESSION, 3])
+                write_ok = cv2.imwrite(temp_path, bgra, [cv2.IMWRITE_PNG_COMPRESSION, 3])
             else:
-                cv2.imwrite(temp_path, bgr, [cv2.IMWRITE_PNG_COMPRESSION, 3])
+                write_ok = cv2.imwrite(temp_path, bgr, [cv2.IMWRITE_PNG_COMPRESSION, 3])
 
-        if os.path.exists(temp_path):
-            os.replace(temp_path, output_path)
+        if not write_ok or not os.path.exists(temp_path):
+            raise IOError(f"cv2.imwrite failed to write image to {temp_path}")
+
+        os.replace(temp_path, output_path)
     except Exception:
         if os.path.exists(temp_path):
             try:
@@ -360,6 +363,9 @@ def run_image_upscaling():
         log(f"[PyTorch] Finished with {failure_count} failure(s) out of {total_images} images.")
     else:
         log(f"[PyTorch] All {success_count} image(s) upscaled successfully.")
+
+    if success_count == 0:
+        sys.exit(1)
 
 
 def main():

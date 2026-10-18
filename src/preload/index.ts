@@ -1,8 +1,11 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { ELECTRON_COMMANDS } from '../../common/electron-commands'
+import type { ImageUpscalePayload, FolderImageUpscalePayload } from '../../common/types/types'
 
 const api = {
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
+
   getModelsList: (backend?: string) =>
     ipcRenderer.invoke(ELECTRON_COMMANDS.GET_MODELS_LIST, backend),
 
@@ -55,33 +58,11 @@ const api = {
     outputFormat?: string
   }) => ipcRenderer.invoke(ELECTRON_COMMANDS.FOLDER_UPSCAYL, payload),
 
-  upscaleImage: (payload: {
-    imagePath: string
-    outputPath?: string
-    model: string
-    scale: string
-    backend?: string
-    customPythonPath?: string
-    ttaMode?: boolean
-    tileSize?: number
-    outputFormat?: string
-    outputQuality?: number
-    pytorchLowVram?: boolean
-  }) => ipcRenderer.invoke(ELECTRON_COMMANDS.UPSCALE_IMAGE, payload),
+  upscaleImage: (payload: ImageUpscalePayload) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.UPSCALE_IMAGE, payload),
 
-  upscaleImageFolder: (payload: {
-    folderPath: string
-    outputPath?: string
-    model: string
-    scale: string
-    backend?: string
-    customPythonPath?: string
-    ttaMode?: boolean
-    tileSize?: number
-    outputFormat?: string
-    outputQuality?: number
-    pytorchLowVram?: boolean
-  }) => ipcRenderer.invoke(ELECTRON_COMMANDS.FOLDER_UPSCALE_IMAGES, payload),
+  upscaleImageFolder: (payload: FolderImageUpscalePayload) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.FOLDER_UPSCALE_IMAGES, payload),
 
   stopUpscaling: () => ipcRenderer.send(ELECTRON_COMMANDS.STOP),
 
