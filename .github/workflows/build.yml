@@ -37,10 +37,10 @@ jobs:
         run: bash scripts/bundle-python-env.sh
 
       - name: Install dependencies
-        run: npm install
+        run: bun install
 
       - name: Build Linux packages
-        run: npm run build:linux
+        run: bun run build:linux
 
       - name: Extract version from package.json
         id: version
