@@ -159,6 +159,10 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  window.webContents.on('will-navigate', (event) => {
+    event.preventDefault()
+  })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     window.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -670,6 +674,29 @@ function registerUpdateHandlers(): void {
 
   ipcMain.handle(ELECTRON_COMMANDS.INSTALL_UPDATE, () => {
     autoUpdater.quitAndInstall()
+  })
+
+  ipcMain.handle(ELECTRON_COMMANDS.INSPECT_PATH, async (_, targetPath: string) => {
+    try {
+      if (!targetPath || typeof targetPath !== 'string') {
+        return { exists: false, isDirectory: false, isFile: false, name: '', ext: '' }
+      }
+      if (!fs.existsSync(targetPath)) {
+        return { exists: false, isDirectory: false, isFile: false, name: '', ext: '' }
+      }
+      const stat = fs.statSync(targetPath)
+      const name = path.basename(targetPath)
+      const ext = path.extname(targetPath).slice(1).toLowerCase()
+      return {
+        exists: true,
+        isDirectory: stat.isDirectory(),
+        isFile: stat.isFile(),
+        name,
+        ext
+      }
+    } catch {
+      return { exists: false, isDirectory: false, isFile: false, name: '', ext: '' }
+    }
   })
 }
 

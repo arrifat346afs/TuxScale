@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileVideo, Film, FolderOpen, FileImage, ImageIcon, AlertCircle, X } from 'lucide-react'
 import { ReactCompareSlider, ReactCompareSliderImage } from 'react-compare-slider'
 import { Button } from './ui/button'
@@ -28,6 +28,7 @@ type MainContentProps = {
   upscaleMode: 'video' | 'image'
   onUpscaleModeChange?: (mode: 'video' | 'image') => void
   batchMode: boolean
+  onBatchModeChange?: (batch: boolean) => void
   videoPath: string | null
   folderPath: string | null
   folderVideoCount: number
@@ -39,7 +40,9 @@ type MainContentProps = {
   videoName: string | null
   onSelectVideo: () => Promise<void>
   onSelectFolder: () => Promise<void>
-  onVideoDropped: (path: string) => void
+  onFileDropped?: (path: string, type: 'video' | 'image') => void
+  onFolderDropped?: (path: string, type: 'video' | 'image') => void
+  onVideoDropped?: (path: string) => void
   onCancel: () => void
 }
 
@@ -47,6 +50,7 @@ export function MainContent({
   upscaleMode,
   onUpscaleModeChange,
   batchMode,
+  onBatchModeChange,
   videoPath,
   folderPath,
   folderVideoCount,
@@ -58,9 +62,12 @@ export function MainContent({
   videoName,
   onSelectVideo,
   onSelectFolder,
+  onFileDropped,
+  onFolderDropped,
   onVideoDropped,
   onCancel
 }: MainContentProps): React.ReactElement {
+  const dragCounter = useRef(0)
   const [isDragging, setIsDragging] = useState(false)
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
   const [upscaledMediaUrl, setUpscaledMediaUrl] = useState<string | null>(null)
@@ -134,64 +141,160 @@ export function MainContent({
 
   const handleDragEnter = (e: React.DragEvent): void => {
     e.preventDefault()
-    setIsDragging(true)
+    e.stopPropagation()
+    dragCounter.current += 1
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy'
+    }
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true)
+    }
   }
 
   const handleDragLeave = (e: React.DragEvent): void => {
     e.preventDefault()
-    setIsDragging(false)
+    e.stopPropagation()
+    dragCounter.current -= 1
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0
+      setIsDragging(false)
+    }
   }
 
   const handleDragOver = (e: React.DragEvent): void => {
     e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy'
+    }
   }
 
-  const handleDrop = (e: React.DragEvent): void => {
+  const handleDrop = async (e: React.DragEvent): Promise<void> => {
     e.preventDefault()
+    e.stopPropagation()
+    dragCounter.current = 0
     setIsDragging(false)
     setDropError(null)
 
-    if (e.dataTransfer.files.length === 0) return
-    const file = e.dataTransfer.files[0]
-    const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
+    let resolvedPath = ''
 
-    const isImage = upscaleMode === 'image'
-    if (isImage) {
-      if (VALID_IMAGE_EXTENSIONS.includes(extension)) {
-        if (batchMode) {
-          void onSelectFolder()
-        } else {
-          const filePath = window.api.getPathForFile(file)
-          if (filePath) {
-            onVideoDropped(filePath)
-          } else {
-            setDropError('Unable to resolve path for the dropped image.')
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0]
+      try {
+        resolvedPath = window.api.getPathForFile(file)
+      } catch (err) {
+        console.warn('getPathForFile failed, trying fallback:', err)
+      }
+      if (!resolvedPath) {
+        resolvedPath = (file as unknown as { path?: string })?.path || ''
+      }
+    }
+
+    if (!resolvedPath && e.dataTransfer) {
+      const uriList = e.dataTransfer.getData('text/uri-list')
+      if (uriList) {
+        const firstUri = uriList.split(/[\r\n]+/).find((u) => u.trim().startsWith('file://'))
+        if (firstUri) {
+          try {
+            resolvedPath = decodeURIComponent(new URL(firstUri.trim()).pathname)
+          } catch (err) {
+            console.warn('Failed to parse URI from uri-list:', err)
           }
         }
-      } else if (VALID_VIDEO_EXTENSIONS.includes(extension)) {
-        setDropError('Selected file is a video. Please switch to Video mode to upscale videos.')
-      } else {
-        setDropError(
-          `Unsupported image format: .${extension}. Supported: PNG, JPG, WEBP, BMP, TIFF.`
-        )
       }
-    } else {
-      if (VALID_VIDEO_EXTENSIONS.includes(extension)) {
-        if (batchMode) {
-          void onSelectFolder()
+    }
+
+    if (!resolvedPath && e.dataTransfer) {
+      const text = e.dataTransfer.getData('text/plain')?.trim()
+      if (text && (text.startsWith('/') || /^[a-zA-Z]:[/\\]/.test(text))) {
+        resolvedPath = text
+      }
+    }
+
+    if (!resolvedPath) {
+      setDropError('Unable to resolve path for the dropped item.')
+      return
+    }
+
+    try {
+      const info = await window.api.inspectPath(resolvedPath)
+      if (!info.exists) {
+        setDropError(`Path does not exist: ${resolvedPath}`)
+        return
+      }
+
+      if (info.isDirectory) {
+        const [videos, images] = await Promise.all([
+          window.api.getFolderVideos(resolvedPath).catch(() => []),
+          window.api.getFolderImages(resolvedPath).catch(() => [])
+        ])
+
+        if (videos.length === 0 && images.length === 0) {
+          setDropError(`No supported video or image files found in folder: ${info.name}`)
+          return
+        }
+
+        let targetMode: 'video' | 'image' = upscaleMode
+        if (upscaleMode === 'image') {
+          if (images.length > 0) {
+            targetMode = 'image'
+          } else if (videos.length > 0) {
+            targetMode = 'video'
+          }
         } else {
-          const filePath = window.api.getPathForFile(file)
-          if (filePath) {
-            onVideoDropped(filePath)
-          } else {
-            setDropError('Unable to resolve path for the dropped video.')
+          if (videos.length > 0) {
+            targetMode = 'video'
+          } else if (images.length > 0) {
+            targetMode = 'image'
           }
         }
-      } else if (VALID_IMAGE_EXTENSIONS.includes(extension)) {
-        setDropError('Selected file is an image. Please switch to Image mode to upscale images.')
-      } else {
-        setDropError(`Unsupported video format: .${extension}.`)
+
+        if (onUpscaleModeChange && targetMode !== upscaleMode) {
+          onUpscaleModeChange(targetMode)
+        }
+        if (onBatchModeChange) {
+          onBatchModeChange(true)
+        }
+        if (onFolderDropped) {
+          await onFolderDropped(resolvedPath, targetMode)
+        } else {
+          onVideoDropped?.(resolvedPath)
+        }
+        return
       }
+
+      if (info.isFile) {
+        const ext = info.ext.toLowerCase()
+        const isVideo = VALID_VIDEO_EXTENSIONS.includes(ext)
+        const isImage = VALID_IMAGE_EXTENSIONS.includes(ext)
+
+        if (!isVideo && !isImage) {
+          setDropError(
+            `Unsupported file format: .${ext || 'unknown'}. Supported: Video (MP4, MKV, AVI, etc.) or Image (PNG, JPG, WEBP, etc.)`
+          )
+          return
+        }
+
+        const targetMode: 'video' | 'image' = isImage ? 'image' : 'video'
+
+        if (onUpscaleModeChange && targetMode !== upscaleMode) {
+          onUpscaleModeChange(targetMode)
+        }
+        if (onBatchModeChange && batchMode) {
+          onBatchModeChange(false)
+        }
+        if (onFileDropped) {
+          onFileDropped(resolvedPath, targetMode)
+        } else {
+          onVideoDropped?.(resolvedPath)
+        }
+        return
+      }
+
+      setDropError('Dropped item is neither a regular file nor a directory.')
+    } catch (err) {
+      console.error('Error handling dropped item:', err)
+      setDropError('Failed to process dropped item.')
     }
   }
 
@@ -254,15 +357,24 @@ export function MainContent({
       )}
 
       {isDragging && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-primary/10 backdrop-blur-sm">
-          <div className="rounded-2xl border-2 border-dashed border-primary bg-card p-8 text-center shadow-lg">
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-primary/10 backdrop-blur-sm">
+          <div className="rounded-2xl border-2 border-dashed border-primary bg-card/95 p-8 text-center shadow-lg backdrop-blur-md">
             {upscaleMode === 'image' ? (
               <FileImage className="mx-auto mb-3 size-10 text-primary" />
             ) : (
               <FileVideo className="mx-auto mb-3 size-10 text-primary" />
             )}
             <p className="text-lg font-medium">
-              {upscaleMode === 'image' ? 'Drop image here' : 'Drop video here'}
+              {batchMode
+                ? upscaleMode === 'image'
+                  ? 'Drop image folder or image here'
+                  : 'Drop video folder or video here'
+                : upscaleMode === 'image'
+                  ? 'Drop image or folder here'
+                  : 'Drop video or folder here'}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Images, videos, or folders supported
             </p>
           </div>
         </div>

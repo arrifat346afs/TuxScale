@@ -10,6 +10,13 @@ import type {
 
 interface Api {
   getPathForFile: (file: File) => string
+  inspectPath: (targetPath: string) => Promise<{
+    exists: boolean
+    isDirectory: boolean
+    isFile: boolean
+    name: string
+    ext: string
+  }>
   getModelsList: (backend?: string) => Promise<string[]>
   getEngineStatus: (payload?: {
     preference?: string

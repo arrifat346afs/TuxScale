@@ -72,6 +72,7 @@ type UseUpscaleReturn = {
   videoName: string | null
   systemInfo: SystemInfo | null
   handleVideoSelected: (path: string) => void
+  handleFolderSelected: (path: string) => Promise<void>
   handleSelectVideo: () => Promise<void>
   handleSelectFolder: () => Promise<void>
   handleSelectOutputFolder: () => Promise<void>
@@ -314,21 +315,25 @@ export function useUpscale(): UseUpscaleReturn {
     }
   }, [handleVideoSelected])
 
+  const handleFolderSelected = useCallback(async (path: string) => {
+    setFolderPath(path)
+    setUpscaledVideoPath(null)
+    setLogs([])
+    setProgress(null)
+    try {
+      const videos = await window.api.getFolderVideos(path)
+      setFolderVideoCount(videos.length)
+    } catch {
+      setFolderVideoCount(0)
+    }
+  }, [])
+
   const handleSelectFolder = useCallback(async () => {
     const path = await window.api.selectFolder()
     if (path) {
-      setFolderPath(path)
-      setUpscaledVideoPath(null)
-      setLogs([])
-      setProgress(null)
-      try {
-        const videos = await window.api.getFolderVideos(path)
-        setFolderVideoCount(videos.length)
-      } catch {
-        setFolderVideoCount(0)
-      }
+      await handleFolderSelected(path)
     }
-  }, [])
+  }, [handleFolderSelected])
 
   const handleSelectOutputFolder = useCallback(async () => {
     const path = await window.api.selectFolder()
@@ -471,6 +476,7 @@ export function useUpscale(): UseUpscaleReturn {
     videoName,
     systemInfo,
     handleVideoSelected,
+    handleFolderSelected,
     handleSelectVideo,
     handleSelectFolder,
     handleSelectOutputFolder,

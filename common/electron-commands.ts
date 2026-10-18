@@ -51,7 +51,8 @@ const ELECTRON_COMMANDS = {
   GET_FOLDER_IMAGES: 'Get image files in a folder',
   INSTALL_PYTORCH_ENV: 'Install PyTorch CUDA Environment',
   CANCEL_PYTORCH_INSTALL: 'Cancel PyTorch CUDA Environment Installation',
-  PYTORCH_INSTALL_PROGRESS: 'PyTorch CUDA Environment Installation Progress'
+  PYTORCH_INSTALL_PROGRESS: 'PyTorch CUDA Environment Installation Progress',
+  INSPECT_PATH: 'Inspect file or directory path'
 } as const
 
 export { ELECTRON_COMMANDS }

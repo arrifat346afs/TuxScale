@@ -4,7 +4,18 @@ import { ELECTRON_COMMANDS } from '../../common/electron-commands'
 import type { ImageUpscalePayload, FolderImageUpscalePayload } from '../../common/types/types'
 
 const api = {
-  getPathForFile: (file: File) => webUtils.getPathForFile(file),
+  getPathForFile: (file: File) => {
+    try {
+      const p = webUtils.getPathForFile(file)
+      if (p) return p
+    } catch {
+      // Fallback
+    }
+    return (file as unknown as { path?: string })?.path || ''
+  },
+
+  inspectPath: (targetPath: string) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.INSPECT_PATH, targetPath),
 
   getModelsList: (backend?: string) =>
     ipcRenderer.invoke(ELECTRON_COMMANDS.GET_MODELS_LIST, backend),

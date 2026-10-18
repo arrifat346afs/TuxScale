@@ -42,6 +42,7 @@ export type UseImageUpscaleReturn = {
   imageQuality: number
   setImageQuality: (quality: number) => void
   handleImageSelected: (path: string) => void
+  handleImageFolderSelected: (path: string) => Promise<void>
   handleSelectImage: () => Promise<void>
   handleSelectImageFolder: () => Promise<void>
   handleSelectImageOutputFolder: () => Promise<void>
@@ -112,23 +113,27 @@ export function useImageUpscale(): UseImageUpscaleReturn {
     }
   }, [handleImageSelected])
 
+  const handleImageFolderSelected = useCallback(async (selected: string) => {
+    setImageFolderPath(selected)
+    setUpscaledImagePath(null)
+    try {
+      const files = await window.api.getFolderImages(selected)
+      setFolderImageCount(files.length)
+    } catch {
+      setFolderImageCount(0)
+    }
+  }, [])
+
   const handleSelectImageFolder = useCallback(async () => {
     try {
       const selected = await window.api.selectImageFolder()
       if (selected) {
-        setImageFolderPath(selected)
-        setUpscaledImagePath(null)
-        try {
-          const files = await window.api.getFolderImages(selected)
-          setFolderImageCount(files.length)
-        } catch {
-          setFolderImageCount(0)
-        }
+        await handleImageFolderSelected(selected)
       }
     } catch (err) {
       console.error('Failed to select image folder:', err)
     }
-  }, [])
+  }, [handleImageFolderSelected])
 
   const handleSelectImageOutputFolder = useCallback(async () => {
     try {
@@ -230,6 +235,7 @@ export function useImageUpscale(): UseImageUpscaleReturn {
     imageQuality,
     setImageQuality,
     handleImageSelected,
+    handleImageFolderSelected,
     handleSelectImage,
     handleSelectImageFolder,
     handleSelectImageOutputFolder,

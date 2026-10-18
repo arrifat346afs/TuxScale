@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ThemeProvider } from './components/theme-provider'
 import { SidebarPanel } from './components/SidebarPanel'
 import { MainContent } from './components/MainContent'
@@ -46,9 +46,51 @@ function App(): React.JSX.Element {
     ? imageUpscale.handleSelectImageOutputFolder
     : upscale.handleSelectOutputFolder
 
+  useEffect(() => {
+    const handleDragOver = (e: DragEvent): void => {
+      e.preventDefault()
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy'
+      }
+    }
+    const handleDrop = (e: DragEvent): void => {
+      e.preventDefault()
+    }
+    window.addEventListener('dragover', handleDragOver)
+    window.addEventListener('drop', handleDrop)
+    return () => {
+      window.removeEventListener('dragover', handleDragOver)
+      window.removeEventListener('drop', handleDrop)
+    }
+  }, [])
+
   const handleActiveInputDropped = isImageMode
     ? imageUpscale.handleImageSelected
     : upscale.handleVideoSelected
+
+  const handleFileDropped = (path: string, type: 'video' | 'image'): void => {
+    if (type === 'image') {
+      imageUpscale.setUpscaleMode('image')
+      imageUpscale.setImageBatchMode(false)
+      imageUpscale.handleImageSelected(path)
+    } else {
+      imageUpscale.setUpscaleMode('video')
+      upscale.setBatchMode(false)
+      upscale.handleVideoSelected(path)
+    }
+  }
+
+  const handleFolderDropped = async (path: string, type: 'video' | 'image'): Promise<void> => {
+    if (type === 'image') {
+      imageUpscale.setUpscaleMode('image')
+      imageUpscale.setImageBatchMode(true)
+      await imageUpscale.handleImageFolderSelected(path)
+    } else {
+      imageUpscale.setUpscaleMode('video')
+      upscale.setBatchMode(true)
+      await upscale.handleFolderSelected(path)
+    }
+  }
 
   const handleUpscale = (): void => {
     if (isImageMode) {
@@ -140,9 +182,12 @@ function App(): React.JSX.Element {
           progress={upscale.progress}
           logs={upscale.logs}
           videoName={activeInputName}
+          onBatchModeChange={handleActiveBatchModeChange}
           onSelectVideo={handleSelectActiveInput}
           onSelectFolder={handleSelectActiveFolder}
           onVideoDropped={handleActiveInputDropped}
+          onFileDropped={handleFileDropped}
+          onFolderDropped={handleFolderDropped}
           onCancel={upscale.handleCancel}
         />
         <CudaPromptModal
