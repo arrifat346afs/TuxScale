@@ -16,7 +16,9 @@ function App(): React.JSX.Element {
   const [modalDismissed, setModalDismissed] = useState(
     () => localStorage.getItem('cudaPromptDismissed') === 'true'
   )
-  const showCudaModal = isNvidiaOk && !isPyTorchAvailable && !modalDismissed
+  // CUDA prompt popup is only available in production (when app is packaged)
+  const isProduction = !!upscale.engineStatus?.isPackaged || import.meta.env.PROD
+  const showCudaModal = isProduction && isNvidiaOk && !isPyTorchAvailable && !modalDismissed
 
   const activeBatchMode = isImageMode ? imageUpscale.imageBatchMode : upscale.batchMode
   const handleActiveBatchModeChange = isImageMode

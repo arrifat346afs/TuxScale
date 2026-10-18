@@ -2,23 +2,16 @@ import { spawn, ChildProcess } from 'child_process'
 import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import os from 'os'
 
 let activeInstallProcess: ChildProcess | null = null
 
 export function getTargetVenvDir(): string {
-  try {
-    return path.join(app.getPath('userData'), 'pytorch-env')
-  } catch {
-    return path.join(process.env.HOME || '~', '.config', 'tuxscale', 'pytorch-env')
-  }
+  return path.join(os.homedir(), '.config', 'tuxscale', 'pytorch-env')
 }
 
 export function getTargetModelsDir(): string {
-  try {
-    return path.join(app.getPath('userData'), 'models')
-  } catch {
-    return path.join(process.env.HOME || '~', '.config', 'tuxscale', 'models')
-  }
+  return path.join(os.homedir(), '.config', 'tuxscale', 'models')
 }
 
 export function getSetupScriptPath(): string {

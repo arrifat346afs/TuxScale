@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import type { BackendId, BackendPreference, Engine, AllEnginesStatus } from './types'
 import { NcnnEngine } from './ncnn'
 import { PyTorchEngine } from './pytorch/runner'
@@ -86,6 +87,7 @@ export async function getAllEnginesStatus(
     activeBackend,
     preference,
     resolvedReason,
+    isPackaged: app.isPackaged,
     detectedPython: pytorchStatus.pythonInfo,
     engines: {
       ncnn: ncnnStatus,

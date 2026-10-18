@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'child_process'
 import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import os from 'os'
 import readline from 'readline'
 import type {
   Engine,
@@ -40,6 +41,9 @@ export function resolvePyTorchWeightsDir(modelName?: string): string {
   } catch {
     // app.getPath might fail if electron app is not ready
   }
+
+  // 4. ~/.config/tuxscale/models
+  candidates.push(path.join(os.homedir(), '.config', 'tuxscale', 'models'))
 
   // If a model is specified, search for the actual .pth file (project root first)
   if (modelName) {
@@ -107,7 +111,8 @@ export class PyTorchEngine implements Engine {
       app.isPackaged
         ? path.join(process.resourcesPath, 'models')
         : path.join(process.cwd(), 'resources', 'models'),
-      path.join(process.cwd(), 'models')
+      path.join(process.cwd(), 'models'),
+      path.join(os.homedir(), '.config', 'tuxscale', 'models')
     ]
     try {
       dirs.push(path.join(app.getPath('userData'), 'models'))

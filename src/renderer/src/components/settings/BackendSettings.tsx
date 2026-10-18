@@ -74,6 +74,7 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
   const showPyTorchOptions = backend === 'pytorch' || engineStatus?.activeBackend === 'pytorch'
   const isNvidiaGpu = !!engineStatus?.engines?.pytorch?.details?.nvidia?.ok
   const isPyTorchReady = !!engineStatus?.engines?.pytorch?.available
+  const isProduction = !!engineStatus?.isPackaged || import.meta.env.PROD
 
   const handleApplyPythonPath = (): void => {
     onCustomPythonPathChange(tempPythonPath.trim())
@@ -112,26 +113,38 @@ export const BackendSettings: React.FC<BackendSettingsProps> = ({
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate">
                     PyTorch CUDA Acceleration
                   </h3>
+                  {!isProduction && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] py-0 px-1 text-muted-foreground border-border"
+                    >
+                      Dev Mode
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   {isPyTorchReady
                     ? 'CUDA acceleration is active in ~/.config/tuxscale/pytorch-env.'
-                    : 'Install PyTorch with CUDA into ~/.config/tuxscale/pytorch-env to enable GPU upscaling.'}
+                    : isProduction
+                      ? 'Install PyTorch with CUDA into ~/.config/tuxscale/pytorch-env to enable GPU upscaling.'
+                      : 'Development mode: manage Python virtualenv via terminal or custom path.'}
                 </p>
               </div>
-              <Button
-                size="sm"
-                variant={isPyTorchReady ? 'outline' : 'default'}
-                className={cn(
-                  'rounded-xl text-xs h-8 px-3 shrink-0 gap-1.5 cursor-pointer',
-                  !isPyTorchReady &&
-                    'bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-xs'
-                )}
-                onClick={() => setInstallModalOpen(true)}
-              >
-                <Sparkles className="size-3.5" />
-                <span>{isPyTorchReady ? 'Reinstall / Update' : 'Install CUDA (~/.config)'}</span>
-              </Button>
+              {isProduction && (
+                <Button
+                  size="sm"
+                  variant={isPyTorchReady ? 'outline' : 'default'}
+                  className={cn(
+                    'rounded-xl text-xs h-8 px-3 shrink-0 gap-1.5 cursor-pointer',
+                    !isPyTorchReady &&
+                      'bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-xs'
+                  )}
+                  onClick={() => setInstallModalOpen(true)}
+                >
+                  <Sparkles className="size-3.5" />
+                  <span>{isPyTorchReady ? 'Reinstall / Update' : 'Install CUDA (~/.config)'}</span>
+                </Button>
+              )}
             </div>
           </div>
         )}

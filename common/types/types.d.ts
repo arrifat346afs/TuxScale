@@ -28,6 +28,7 @@ export type AllEnginesStatus = {
   activeBackend: BackendId
   preference: BackendPreference
   resolvedReason: string
+  isPackaged?: boolean
   detectedPython?: {
     command: string
     version?: string
