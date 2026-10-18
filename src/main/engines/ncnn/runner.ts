@@ -147,6 +147,62 @@ export function runUpscaylBin(
   })
 }
 
+export function runUpscaylBinImage(options: {
+  inputPath: string
+  outputPath: string
+  model: string
+  scale: string
+  format: string
+  compression?: number
+  ttaMode?: boolean
+  tileSize?: number
+  onProgressLine?: (line: string) => void
+}): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const binaryPath = getBinaryPath()
+    const modelPath = getModelPath()
+
+    const args = [
+      '-i',
+      options.inputPath,
+      '-o',
+      options.outputPath,
+      '-m',
+      modelPath,
+      '-n',
+      options.model,
+      '-s',
+      options.scale,
+      '-f',
+      options.format,
+      '-c',
+      String(options.compression ?? (options.format === 'png' ? 0 : 5))
+    ]
+
+    if (options.ttaMode) args.push('-x')
+    if (options.tileSize && options.tileSize > 0) args.push('-t', String(options.tileSize))
+
+    const proc = spawn(binaryPath, args)
+    trackProcess(proc)
+
+    proc.stdout?.on('data', (data: Buffer) => {
+      options.onProgressLine?.(data.toString('utf-8'))
+    })
+
+    proc.stderr?.on('data', (data: Buffer) => {
+      options.onProgressLine?.(data.toString('utf-8'))
+    })
+
+    proc.on('close', (code) => {
+      if (code === 0) resolve()
+      else if (code === null) reject(new Error('Process was terminated'))
+      else reject(new Error(`upscayl-bin exited with code ${code}`))
+    })
+
+    proc.on('error', reject)
+  })
+}
+
 export async function upscaleFramesBatch(
   frameDir: string,
   upscaledDir: string,

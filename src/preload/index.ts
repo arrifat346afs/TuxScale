@@ -1,8 +1,11 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { ELECTRON_COMMANDS } from '../../common/electron-commands'
+import type { ImageUpscalePayload, FolderImageUpscalePayload } from '../../common/types/types'
 
 const api = {
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
+
   getModelsList: (backend?: string) =>
     ipcRenderer.invoke(ELECTRON_COMMANDS.GET_MODELS_LIST, backend),
 
@@ -11,13 +14,23 @@ const api = {
 
   selectVideo: () => ipcRenderer.invoke(ELECTRON_COMMANDS.SELECT_FILE),
 
+  selectImage: () => ipcRenderer.invoke(ELECTRON_COMMANDS.SELECT_IMAGE),
+
   selectFolder: () => ipcRenderer.invoke(ELECTRON_COMMANDS.SELECT_FOLDER),
+
+  selectImageFolder: () => ipcRenderer.invoke(ELECTRON_COMMANDS.SELECT_IMAGE_FOLDER),
 
   getFolderVideos: (folderPath: string) =>
     ipcRenderer.invoke(ELECTRON_COMMANDS.GET_FOLDER_VIDEOS, folderPath),
 
+  getFolderImages: (folderPath: string) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.GET_FOLDER_IMAGES, folderPath),
+
   getVideoUrl: (videoPath: string) =>
     ipcRenderer.invoke(ELECTRON_COMMANDS.GET_VIDEO_URL, videoPath),
+
+  getImageUrl: (imagePath: string) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.GET_IMAGE_URL, imagePath),
 
   upscaleVideo: (payload: {
     videoPath: string
@@ -45,6 +58,12 @@ const api = {
     outputFormat?: string
   }) => ipcRenderer.invoke(ELECTRON_COMMANDS.FOLDER_UPSCAYL, payload),
 
+  upscaleImage: (payload: ImageUpscalePayload) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.UPSCALE_IMAGE, payload),
+
+  upscaleImageFolder: (payload: FolderImageUpscalePayload) =>
+    ipcRenderer.invoke(ELECTRON_COMMANDS.FOLDER_UPSCALE_IMAGES, payload),
+
   stopUpscaling: () => ipcRenderer.send(ELECTRON_COMMANDS.STOP),
 
   onProgress: (
@@ -54,8 +73,10 @@ const api = {
       callback(data as { current: number; total: number; stage: string; message?: string })
     }
     ipcRenderer.on(ELECTRON_COMMANDS.UPSCAYL_VIDEO_PROGRESS, handler)
+    ipcRenderer.on(ELECTRON_COMMANDS.UPSCALE_IMAGE_PROGRESS, handler)
     return () => {
       ipcRenderer.removeListener(ELECTRON_COMMANDS.UPSCAYL_VIDEO_PROGRESS, handler)
+      ipcRenderer.removeListener(ELECTRON_COMMANDS.UPSCALE_IMAGE_PROGRESS, handler)
     }
   },
 
@@ -64,8 +85,10 @@ const api = {
       callback(data as { outputPath: string })
     }
     ipcRenderer.on(ELECTRON_COMMANDS.UPSCAYL_VIDEO_DONE, handler)
+    ipcRenderer.on(ELECTRON_COMMANDS.UPSCALE_IMAGE_DONE, handler)
     return () => {
       ipcRenderer.removeListener(ELECTRON_COMMANDS.UPSCAYL_VIDEO_DONE, handler)
+      ipcRenderer.removeListener(ELECTRON_COMMANDS.UPSCALE_IMAGE_DONE, handler)
     }
   },
 

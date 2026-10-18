@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   XCircle,
   FileVideo,
+  FileImage,
   Download
 } from 'lucide-react'
 import type {
@@ -72,6 +73,11 @@ type SidebarPanelProps = {
   onBatchSizeChange: (size: number) => void
   outputFormat: string
   onOutputFormatChange: (format: string) => void
+  upscaleMode: 'video' | 'image'
+  imageOutputFormat: 'png' | 'jpg' | 'webp'
+  onImageOutputFormatChange: (format: 'png' | 'jpg' | 'webp') => void
+  imageQuality: number
+  onImageQualityChange: (quality: number) => void
   videoPath: string | null
   folderPath: string | null
   outputPath: string | null
@@ -108,10 +114,10 @@ export const SidebarPanel = ({
   models,
   scale,
   onScaleChange,
-  // ttaMode,
-  // onTtaModeChange,
-  // tileSize,
-  // onTileSizeChange,
+  ttaMode,
+  onTtaModeChange,
+  tileSize,
+  onTileSizeChange,
   pytorchLowVram,
   onPytorchLowVramChange,
   pytorchEncoder,
@@ -122,6 +128,11 @@ export const SidebarPanel = ({
   onBatchSizeChange,
   outputFormat,
   onOutputFormatChange,
+  upscaleMode,
+  imageOutputFormat,
+  onImageOutputFormatChange,
+  imageQuality,
+  onImageQualityChange,
   videoPath,
   folderPath,
   outputPath,
@@ -146,7 +157,9 @@ export const SidebarPanel = ({
           </div>
           <div className="flex flex-col">
             <span className="text-2xl font-semibold leading-none">TuxScale</span>
-            <span className="text-sm text-muted-foreground">AI Video Upscaler</span>
+            <span className="text-sm text-muted-foreground">
+              {upscaleMode === 'image' ? 'AI Image Upscaler' : 'AI Video Upscaler'}
+            </span>
           </div>
         </div>
 
@@ -169,12 +182,12 @@ export const SidebarPanel = ({
               <div className="flex items-center gap-2">
                 <Switch id="batch-mode" checked={batchMode} onCheckedChange={onBatchModeChange} />
                 <Label htmlFor="batch-mode" className="cursor-pointer">
-                  Batch Upscale
+                  {upscaleMode === 'image' ? 'Batch Upscale (Folder)' : 'Batch Upscale'}
                 </Label>
               </div>
 
               <div className="space-y-3 rounded-md border border-border/60 bg-popover/80 p-5 shadow-sm shadow-black/5">
-                <div className="inline-flex items-center   bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                <div className="inline-flex items-center bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Step 1
                 </div>
                 {batchMode ? (
@@ -186,6 +199,16 @@ export const SidebarPanel = ({
                   >
                     <FolderOpen />
                     Select Folder
+                  </Button>
+                ) : upscaleMode === 'image' ? (
+                  <Button
+                    variant="secondary"
+                    className="w-full rounded-full"
+                    onClick={onSelectVideo}
+                    disabled={isProcessing}
+                  >
+                    <FileImage />
+                    Select Image
                   </Button>
                 ) : (
                   <Button
@@ -237,23 +260,39 @@ export const SidebarPanel = ({
                 </Select>
 
                 {activeBackend === 'ncnn' ? (
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="double-upscale"
-                      checked={doubleUpscale}
-                      onCheckedChange={onDoubleUpscaleChange}
-                      disabled={isProcessing}
-                    />
-                    <Label htmlFor="double-upscale" className="cursor-pointer">
-                      Double Upscale
-                    </Label>
-                    <HelpCircle className="size-4 text-muted-foreground" />
+                  <div className="space-y-2">
+                    {upscaleMode === 'video' && (
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="double-upscale"
+                          checked={doubleUpscale}
+                          onCheckedChange={onDoubleUpscaleChange}
+                          disabled={isProcessing}
+                        />
+                        <Label htmlFor="double-upscale" className="cursor-pointer">
+                          Double Upscale
+                        </Label>
+                        <HelpCircle className="size-4 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        id="tta-mode"
+                        checked={ttaMode}
+                        onCheckedChange={onTtaModeChange}
+                        disabled={isProcessing}
+                      />
+                      <Label htmlFor="tta-mode" className="cursor-pointer">
+                        TTA Mode
+                      </Label>
+                      <HelpCircle className="size-4 text-muted-foreground" />
+                    </div>
                   </div>
                 ) : null}
 
-                <div className="rounded border border-border/50  p-2">
+                <div className="rounded border border-border/50 p-2">
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Video Scale</span>
+                    <span>{upscaleMode === 'image' ? 'Image Scale' : 'Video Scale'}</span>
                     <span className="font-semibold text-foreground">{scale[0]}x</span>
                   </div>
                   <Slider
@@ -278,7 +317,11 @@ export const SidebarPanel = ({
                   <div className="inline-flex items-center rounded-full bg-muted/10 px-1 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                     Step 3
                   </div>
-                  <p className="text-xs text-muted-foreground">Defaults to Video&apos;s path</p>
+                  <p className="text-xs text-muted-foreground">
+                    {upscaleMode === 'image'
+                      ? "Defaults to Image's path"
+                      : "Defaults to Video's path"}
+                  </p>
                 </div>
                 <Button
                   variant="secondary"
@@ -329,53 +372,108 @@ export const SidebarPanel = ({
                 onPytorchEncoderChange={onPytorchEncoderChange}
                 pytorchSkipDuplicates={pytorchSkipDuplicates}
                 onPytorchSkipDuplicatesChange={onPytorchSkipDuplicatesChange}
+                isImageMode={upscaleMode === 'image'}
               />
 
               {/* Export Settings Card */}
               <div className="rounded-xl border border-border/70 bg-card p-4 space-y-3 shadow-xs">
                 <div className="flex items-center gap-2">
-                  <FileVideo className="size-4 text-primary" />
+                  {upscaleMode === 'image' ? (
+                    <FileImage className="size-4 text-primary" />
+                  ) : (
+                    <FileVideo className="size-4 text-primary" />
+                  )}
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Export Settings
                   </h3>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">Export Format</Label>
-                  <Select value={outputFormat} onValueChange={onOutputFormatChange}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Video Formats</SelectLabel>
-                        <SelectItem value="mp4">MP4 (H.264)</SelectItem>
-                        <SelectItem value="webm">WebM (VP9)</SelectItem>
-                        <SelectItem value="mkv">MKV (H.264)</SelectItem>
-                        <SelectItem value="avi">AVI</SelectItem>
-                        <SelectItem value="mov">MOV (H.264)</SelectItem>
-                      </SelectGroup>
-                      <SelectGroup>
-                        <SelectLabel>Audio Formats</SelectLabel>
-                        <SelectItem value="mp3">MP3</SelectItem>
-                        <SelectItem value="wav">WAV</SelectItem>
-                        <SelectItem value="aac">AAC</SelectItem>
-                        <SelectItem value="flac">FLAC</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] text-muted-foreground truncate">
-                    {outputFormat === 'mp4' ||
-                    outputFormat === 'webm' ||
-                    outputFormat === 'mkv' ||
-                    outputFormat === 'avi' ||
-                    outputFormat === 'mov'
-                      ? activeBackend === 'pytorch' && outputFormat !== 'mp4'
-                        ? `PyTorch streams MP4 and remuxes to ${outputFormat.toUpperCase()}.`
-                        : `Upscaled video will use ${outputFormat.toUpperCase()} container.`
-                      : 'Audio stream extracted from source video.'}
-                  </p>
-                </div>
+                {upscaleMode === 'image' ? (
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Image Format</Label>
+                      <Select
+                        value={imageOutputFormat}
+                        onValueChange={(val) =>
+                          onImageOutputFormatChange(val as 'png' | 'jpg' | 'webp')
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="png">PNG (Lossless)</SelectItem>
+                          <SelectItem value="jpg">JPG (Compressed)</SelectItem>
+                          <SelectItem value="webp">WebP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground">
+                        {imageOutputFormat === 'png'
+                          ? 'Lossless compression with transparency support.'
+                          : imageOutputFormat === 'jpg'
+                            ? 'Standard compressed format without alpha transparency.'
+                            : 'Modern web format supporting transparency.'}
+                      </p>
+                    </div>
+
+                    {(imageOutputFormat === 'jpg' || imageOutputFormat === 'webp') && (
+                      <div className="space-y-1.5 pt-1 border-t border-border/50">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-xs font-medium">Quality</Label>
+                          <span className="font-semibold text-foreground">{imageQuality}%</span>
+                        </div>
+                        <Slider
+                          className="h-9"
+                          value={[imageQuality]}
+                          onValueChange={(vals) => onImageQualityChange(vals[0])}
+                          min={1}
+                          max={100}
+                          step={1}
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          Higher values yield better visual quality with larger files.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Export Format</Label>
+                    <Select value={outputFormat} onValueChange={onOutputFormatChange}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Video Formats</SelectLabel>
+                          <SelectItem value="mp4">MP4 (H.264)</SelectItem>
+                          <SelectItem value="webm">WebM (VP9)</SelectItem>
+                          <SelectItem value="mkv">MKV (H.264)</SelectItem>
+                          <SelectItem value="avi">AVI</SelectItem>
+                          <SelectItem value="mov">MOV (H.264)</SelectItem>
+                        </SelectGroup>
+                        <SelectGroup>
+                          <SelectLabel>Audio Formats</SelectLabel>
+                          <SelectItem value="mp3">MP3</SelectItem>
+                          <SelectItem value="wav">WAV</SelectItem>
+                          <SelectItem value="aac">AAC</SelectItem>
+                          <SelectItem value="flac">FLAC</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {outputFormat === 'mp4' ||
+                      outputFormat === 'webm' ||
+                      outputFormat === 'mkv' ||
+                      outputFormat === 'avi' ||
+                      outputFormat === 'mov'
+                        ? activeBackend === 'pytorch' && outputFormat !== 'mp4'
+                          ? `PyTorch streams MP4 and remuxes to ${outputFormat.toUpperCase()}.`
+                          : `Upscaled video will use ${outputFormat.toUpperCase()} container.`
+                        : 'Audio stream extracted from source video.'}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {activeBackend === 'ncnn' && (
@@ -383,27 +481,52 @@ export const SidebarPanel = ({
                   <div className="flex items-center gap-2">
                     <Layers className="size-4 text-primary" />
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      NCNN Batching
+                      NCNN Settings
                     </h3>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Frames per batch</Label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={batchSize}
-                        onChange={(e) =>
-                          onBatchSizeChange(Math.max(1, parseInt(e.target.value) || 1))
-                        }
-                        disabled={isProcessing}
-                        className="w-20 h-9 rounded-xl border border-input/60 bg-background/90 px-3 text-xs text-center transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                      <p className="text-[11px] text-muted-foreground">
-                        Lower = less RAM, higher = faster
-                      </p>
+
+                  {upscaleMode === 'video' && (
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Frames per batch</Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={batchSize}
+                          onChange={(e) =>
+                            onBatchSizeChange(Math.max(1, parseInt(e.target.value) || 1))
+                          }
+                          disabled={isProcessing}
+                          className="w-20 h-9 rounded-xl border border-input/60 bg-background/90 px-3 text-xs text-center transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          Lower = less RAM, higher = faster
+                        </p>
+                      </div>
                     </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">Tile Size</Label>
+                    <Select
+                      value={tileSize}
+                      onValueChange={onTileSizeChange}
+                      disabled={isProcessing}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Auto / No Tiling</SelectItem>
+                        <SelectItem value="256">256px</SelectItem>
+                        <SelectItem value="512">512px</SelectItem>
+                        <SelectItem value="1024">1024px</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground">
+                      Smaller tiles reduce VRAM usage on large inputs.
+                    </p>
                   </div>
                 </div>
               )}

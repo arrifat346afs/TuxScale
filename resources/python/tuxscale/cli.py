@@ -50,6 +50,13 @@ def parse_args():
 
 
 def main():
+    if '--images' in sys.argv:
+        # Remove --images and dispatch to images upscaler
+        sys.argv.remove('--images')
+        from tuxscale.images import main as images_main
+        images_main()
+        return
+
     args = parse_args()
 
     if not os.path.exists(args.input):

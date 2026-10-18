@@ -3,10 +3,22 @@ import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import readline from 'readline'
-import type { Engine, EngineUpscaleOptions, EngineStatus } from '../types'
-import { detectPyTorch, getScriptPath, resolvePythonCommand, type PyTorchDetection } from './detect'
+import type {
+  Engine,
+  EngineUpscaleOptions,
+  EngineImageUpscaleOptions,
+  EngineStatus
+} from '../types'
+import {
+  detectPyTorch,
+  getScriptPath,
+  getImageScriptPath,
+  resolvePythonCommand,
+  type PyTorchDetection
+} from './detect'
 import { parseProgressLine } from './progress'
 import { resolveOutputPath, FORMAT_CONFIG } from '../shared/output'
+import { resolveImageOutputPath } from '../shared/image-output'
 
 export function resolvePyTorchWeightsDir(modelName?: string): string {
   const candidates: string[] = []
@@ -302,6 +314,208 @@ export class PyTorchEngine implements Engine {
     return finalOutputPath
   }
 
+  async upscaleImages(options: EngineImageUpscaleOptions): Promise<string[]> {
+    const {
+      inputPaths,
+      model,
+      scale,
+      customPythonPath,
+      tileSize,
+      outputQuality,
+      onProgress,
+      sendLog,
+      pytorchLowVram
+    } = options
+    if (inputPaths.length === 0) return []
+
+    const detection = await this.detect(customPythonPath)
+    if (!detection.available) {
+      const failing = Object.entries(detection.details)
+        .filter(([, v]) => !v.ok)
+        .map(([k, v]) => `${k}: ${v.message}`)
+        .join(' | ')
+      throw new Error(`PyTorch backend is unavailable: ${failing}`)
+    }
+
+    const scriptPath = getImageScriptPath()
+    if (!fs.existsSync(scriptPath)) {
+      throw new Error(`PyTorch image worker script not found at: ${scriptPath}`)
+    }
+
+    const pythonBin = resolvePythonCommand(customPythonPath).command
+    const weightsDir = resolvePyTorchWeightsDir(model)
+    const outputFormat = (options.outputFormat || 'png').toLowerCase().replace(/^\./, '')
+    const format = outputFormat === 'jpeg' ? 'jpg' : outputFormat
+    const quality = outputQuality ?? 95
+
+    // Resolve non-overwriting distinct output paths for all input files
+    const reservedPaths = new Set<string>()
+    const resolvedOutputs = inputPaths.map((p) => {
+      const out = resolveImageOutputPath(p, options.outputPath, format, reservedPaths)
+      reservedPaths.add(out)
+      return out
+    })
+    this.currentPartialFiles = [...resolvedOutputs]
+
+    const total = inputPaths.length
+    sendLog(
+      `[PyTorch] Starting image upscale for ${total} image(s) with model '${model}', scale ${scale}x, format ${format}`
+    )
+    if (pytorchLowVram) sendLog('[PyTorch] Low VRAM mode enabled')
+
+    const tempDir = app.getPath('temp')
+    const inListFile = path.join(tempDir, `tuxscale_pt_in_${Date.now()}.json`)
+    const outListFile = path.join(tempDir, `tuxscale_pt_out_${Date.now()}.json`)
+
+    fs.writeFileSync(inListFile, JSON.stringify(inputPaths), 'utf-8')
+    fs.writeFileSync(outListFile, JSON.stringify(resolvedOutputs), 'utf-8')
+
+    const args = [
+      scriptPath,
+      '--input-list',
+      inListFile,
+      '--output-list',
+      outListFile,
+      '--model',
+      model,
+      '--scale',
+      String(scale),
+      '--format',
+      format,
+      '--quality',
+      String(quality),
+      '--weights-dir',
+      weightsDir
+    ]
+
+    if (pytorchLowVram) {
+      args.push('--low-vram')
+    }
+    if (tileSize && tileSize > 0) {
+      args.push('--tile', String(tileSize))
+    }
+
+    onProgress({
+      current: 0,
+      total,
+      stage: 'upscaling',
+      message: `Initializing PyTorch image upscaling for ${total} image(s)...`,
+      overall: 0,
+      batchInfo:
+        total > 1
+          ? {
+              currentVideo: 0,
+              totalVideos: total,
+              videoName: path.basename(inputPaths[0])
+            }
+          : undefined
+    })
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn(pythonBin, args, {
+          stdio: ['ignore', 'pipe', 'pipe']
+        })
+        this.activeProcesses.push(proc)
+
+        const rl = readline.createInterface({ input: proc.stdout! })
+        rl.on('line', (line) => {
+          const trimmed = line.trim()
+          if (trimmed.startsWith('PROGRESS ')) {
+            const parts = trimmed.split(' ')
+            const current = parseInt(parts[1], 10) || 0
+            const tot = parseInt(parts[2], 10) || total
+            const isDone = current === tot
+
+            if (total === 1) {
+              onProgress({
+                current,
+                total: tot,
+                stage: isDone ? 'done' : 'upscaling',
+                message: isDone
+                  ? 'Image upscaling complete!'
+                  : `Upscaling ${path.basename(inputPaths[0])}...`,
+                overall: tot > 0 ? current / tot : 0
+              })
+            } else {
+              const currentName = path.basename(
+                inputPaths[Math.min(Math.max(0, current - 1), total - 1)] ?? ''
+              )
+              onProgress({
+                current,
+                total: tot,
+                stage: isDone ? 'done' : 'upscaling',
+                message: isDone
+                  ? `Batch upscaling complete! (${tot}/${tot})`
+                  : `Upscaled ${current}/${tot} images`,
+                overall: tot > 0 ? current / tot : 0,
+                batchInfo: {
+                  currentVideo: current,
+                  totalVideos: tot,
+                  videoName: currentName
+                }
+              })
+            }
+          }
+        })
+
+        proc.stderr?.on('data', (data: Buffer) => {
+          const str = data.toString('utf-8')
+          const lines = str.split('\n').filter((l) => l.trim().length > 0)
+          for (const l of lines) {
+            sendLog(l)
+          }
+        })
+
+        proc.on('close', (code) => {
+          this.activeProcesses = this.activeProcesses.filter((p) => p !== proc)
+          if (code === 0) {
+            resolve()
+          } else if (code === null) {
+            reject(new Error('PyTorch image upscaling process was cancelled'))
+          } else {
+            reject(new Error(`PyTorch image worker failed with exit code ${code}`))
+          }
+        })
+
+        proc.on('error', (err) => {
+          this.activeProcesses = this.activeProcesses.filter((p) => p !== proc)
+          reject(new Error(`Failed to spawn Python process (${pythonBin}): ${err.message}`))
+        })
+      })
+
+      const existingOutputs = resolvedOutputs.filter((p) => fs.existsSync(p))
+      onProgress({
+        current: total,
+        total,
+        stage: 'done',
+        message: 'Image upscaling complete!',
+        overall: 1.0,
+        batchInfo:
+          total > 1
+            ? {
+                currentVideo: total,
+                totalVideos: total,
+                videoName: `${existingOutputs.length}/${total} done`
+              }
+            : undefined
+      })
+      sendLog(
+        `[PyTorch] Upscaling complete! Generated ${existingOutputs.length}/${total} image file(s).`
+      )
+
+      this.currentPartialFiles = []
+      return existingOutputs
+    } finally {
+      try {
+        if (fs.existsSync(inListFile)) fs.unlinkSync(inListFile)
+        if (fs.existsSync(outListFile)) fs.unlinkSync(outListFile)
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }
+
   stop(): void {
     for (const proc of this.activeProcesses) {
       if (!proc.killed) {
@@ -319,6 +533,22 @@ export class PyTorchEngine implements Engine {
       try {
         if (fs.existsSync(file)) {
           fs.unlinkSync(file)
+        }
+        const partFile = `${file}.part`
+        if (fs.existsSync(partFile)) {
+          fs.unlinkSync(partFile)
+        }
+        const dir = path.dirname(file)
+        const base = path.basename(file)
+        if (fs.existsSync(dir)) {
+          const matching = fs.readdirSync(dir).filter((f) => f.startsWith(`${base}.tmp`))
+          for (const m of matching) {
+            try {
+              fs.unlinkSync(path.join(dir, m))
+            } catch {
+              // Ignore
+            }
+          }
         }
       } catch {
         // Ignore

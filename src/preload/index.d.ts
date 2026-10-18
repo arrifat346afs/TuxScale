@@ -3,21 +3,30 @@ import type {
   SystemInfo,
   AllEnginesStatus,
   VideoUpscaylPayload,
-  FolderUpscaylPayload
+  FolderUpscaylPayload,
+  ImageUpscalePayload,
+  FolderImageUpscalePayload
 } from '../../common/types/types'
 
 interface Api {
+  getPathForFile: (file: File) => string
   getModelsList: (backend?: string) => Promise<string[]>
   getEngineStatus: (payload?: {
     preference?: string
     customPythonPath?: string
   }) => Promise<AllEnginesStatus>
   selectVideo: () => Promise<string | null>
+  selectImage: () => Promise<string | null>
   selectFolder: () => Promise<string | null>
+  selectImageFolder: () => Promise<string | null>
   getFolderVideos: (folderPath: string) => Promise<string[]>
+  getFolderImages: (folderPath: string) => Promise<string[]>
   getVideoUrl: (videoPath: string) => Promise<string>
+  getImageUrl: (imagePath: string) => Promise<string>
   upscaleVideo: (payload: VideoUpscaylPayload) => Promise<void>
   upscaleFolder: (payload: FolderUpscaylPayload) => Promise<void>
+  upscaleImage: (payload: ImageUpscalePayload) => Promise<void>
+  upscaleImageFolder: (payload: FolderImageUpscalePayload) => Promise<void>
   stopUpscaling: () => void
   onProgress: (
     callback: (data: { current: number; total: number; stage: string; message?: string }) => void

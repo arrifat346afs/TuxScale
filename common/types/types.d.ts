@@ -58,6 +58,24 @@ export type FolderUpscaylPayload = Omit<VideoUpscaylPayload, 'videoPath'> & {
   folderPath: string
 }
 
+export type ImageUpscalePayload = {
+  imagePath: string
+  outputPath?: string
+  model: string
+  scale: string
+  backend?: BackendPreference
+  customPythonPath?: string
+  ttaMode?: boolean
+  tileSize?: number
+  outputFormat?: 'png' | 'jpg' | 'webp' | string
+  outputQuality?: number
+  pytorchLowVram?: boolean
+}
+
+export type FolderImageUpscalePayload = Omit<ImageUpscalePayload, 'imagePath'> & {
+  folderPath: string
+}
+
 export type SystemInfo = {
   os: {
     platform: string
