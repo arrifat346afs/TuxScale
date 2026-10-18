@@ -3,6 +3,7 @@ import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import os from 'os'
+import { clearPyTorchDetectionCache } from './detect'
 
 let activeInstallProcess: ChildProcess | null = null
 
@@ -128,6 +129,7 @@ export function installPyTorchEnv(
       if (signal === 'SIGTERM' || signal === 'SIGINT') {
         resolve({ success: false, error: 'Installation was cancelled by user.' })
       } else if (code === 0) {
+        clearPyTorchDetectionCache()
         onProgress({
           percent: 100,
           message: 'PyTorch CUDA setup complete!',

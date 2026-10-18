@@ -141,9 +141,18 @@ function createWindow(): void {
 
   mainWindow = window
 
-  window.on('ready-to-show', () => {
-    window.show()
-  })
+  let hasShown = false
+  const showWindow = (): void => {
+    if (!hasShown && !window.isDestroyed()) {
+      hasShown = true
+      window.show()
+    }
+  }
+
+  window.on('ready-to-show', showWindow)
+
+  // Safety fallback: ensure window is visible after 1.5s even if ready-to-show is delayed by platform/driver
+  setTimeout(showWindow, 1500)
 
   window.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)

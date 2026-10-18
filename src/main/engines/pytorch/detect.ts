@@ -150,7 +150,27 @@ function runCmd(cmd: string, args: string[], timeout = 6000): Promise<string> {
   })
 }
 
-export async function detectPyTorch(customPythonPath?: string): Promise<PyTorchDetection> {
+let cachedDetection: { result: PyTorchDetection; timestamp: number; key: string } | null = null
+
+export function clearPyTorchDetectionCache(): void {
+  cachedDetection = null
+}
+
+export async function detectPyTorch(
+  customPythonPath?: string,
+  force = false
+): Promise<PyTorchDetection> {
+  const cacheKey = customPythonPath || '__auto__'
+  const now = Date.now()
+  if (
+    !force &&
+    cachedDetection &&
+    cachedDetection.key === cacheKey &&
+    now - cachedDetection.timestamp < 10000
+  ) {
+    return cachedDetection.result
+  }
+
   const pythonResolution = resolvePythonCommand(customPythonPath)
   const pythonCmd = pythonResolution.command
 
@@ -167,31 +187,7 @@ export async function detectPyTorch(customPythonPath?: string): Promise<PyTorchD
   let gpuName: string | undefined
   let detectedVersion: string | undefined
 
-  // 1. Check NVIDIA GPU
-  try {
-    const nvOut = await runCmd('nvidia-smi', ['--query-gpu=name', '--format=csv,noheader'])
-    if (nvOut) {
-      gpuName = nvOut.split('\n')[0].trim()
-      details.nvidia = {
-        ok: true,
-        message: `NVIDIA GPU: ${gpuName}`
-      }
-    } else {
-      details.nvidia = {
-        ok: false,
-        message: 'No NVIDIA GPU detected via nvidia-smi',
-        fixHint: 'Verify NVIDIA GPU connection and proprietary drivers are installed.'
-      }
-    }
-  } catch {
-    details.nvidia = {
-      ok: false,
-      message: 'nvidia-smi not found or no NVIDIA driver installed',
-      fixHint: 'Install NVIDIA GPU proprietary display drivers.'
-    }
-  }
-
-  // 2. Check Script Path
+  // 1. Check Script Path synchronously
   const scriptPath = getScriptPath()
   const imageScriptPath = getImageScriptPath()
   if (fs.existsSync(scriptPath) && fs.existsSync(imageScriptPath)) {
@@ -208,74 +204,17 @@ export async function detectPyTorch(customPythonPath?: string): Promise<PyTorchD
     }
   }
 
-  // 3. Check Python and Python version
-  try {
-    const verScript =
-      'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")'
-    const pyVer = await runCmd(pythonCmd, ['-c', verScript])
-    detectedVersion = pyVer
-
-    const parts = pyVer.split('.').map((p) => parseInt(p, 10))
-    const major = parts[0] || 3
-    const minor = parts[1] || 0
-
-    const sourceTag =
-      pythonResolution.source === 'bundled'
-        ? ' (bundled)'
-        : pythonResolution.source === 'auto-venv'
-          ? ' (auto-detected venv)'
-          : pythonResolution.source === 'custom'
-            ? ' (custom)'
-            : ''
-
-    details.python = {
-      ok: true,
-      message: `Python ${pyVer}${sourceTag} at ${pythonCmd}`
-    }
-
-    // Show warning if Python is newer than 3.12 (e.g. 3.13, 3.14)
-    if (major === 3 && minor > 12) {
-      details.python.warning = true
-      details.python.warningMessage = `Python ${major}.${minor} may not be supported by PyTorch / Real-ESRGAN packages. Use a Python 3.11 or 3.12 virtualenv.`
-    }
-  } catch {
-    details.python = {
-      ok: false,
-      message: `Python not executable at "${pythonCmd}". Set a valid virtualenv path in Settings.`,
-      fixHint: 'Create a Python 3.11 or 3.12 virtualenv or specify custom path.'
-    }
-    details.torch = {
-      ok: false,
-      message: 'Python not found',
-      fixHint: 'Configure a valid Python environment first.'
-    }
-    details.cuda = { ok: false, message: 'Python not found' }
-    details.realesrgan = { ok: false, message: 'Python not found' }
-    details.spandrel = { ok: false, message: 'Python not found' }
-
-    return {
-      available: false,
-      gpuName,
-      pythonInfo: {
-        command: pythonCmd,
-        version: detectedVersion,
-        source: pythonResolution.source
-      },
-      details
-    }
-  }
-
-  // 4. Real imports for PyTorch, CUDA, basicsr, realesrgan, and spandrel
-  try {
-    const checkScript = `
+  const unifiedScript = `
 import sys
-import types
+
+py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
 # Test guarded shim for torchvision functional_tensor
 try:
     import torchvision.transforms.functional_tensor
 except ImportError:
     try:
+        import types
         import torchvision.transforms
         import torchvision.transforms.functional as _F
         _mod = types.ModuleType('torchvision.transforms.functional_tensor')
@@ -287,7 +226,6 @@ except ImportError:
     except Exception:
         pass
 
-# Check PyTorch & CUDA
 torch_ver = "none"
 cuda_avail = False
 cuda_ver = "none"
@@ -300,7 +238,6 @@ try:
 except Exception as e:
     torch_err = str(e)
 
-# Check Real-ESRGAN & basicsr real imports
 realesrgan_ok = False
 realesrgan_err = ""
 try:
@@ -311,7 +248,6 @@ try:
 except Exception as e:
     realesrgan_err = str(e)
 
-# Check spandrel import
 spandrel_ok = False
 spandrel_err = ""
 try:
@@ -321,98 +257,157 @@ try:
 except Exception as e:
     spandrel_err = str(e)
 
-print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}:::{spandrel_ok}:::{torch_err}:::{realesrgan_err}:::{spandrel_err}")
+print(f"{py_ver}:::{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}:::{spandrel_ok}:::{torch_err}:::{realesrgan_err}:::{spandrel_err}")
 `
-    const pyCheck = await runCmd(pythonCmd, ['-c', checkScript], 10000)
-    const [
-      torchVer,
-      cudaAvail,
-      cudaVer,
-      realesrganOk,
-      spandrelOk,
-      torchErr,
-      realesrganErr,
-      spandrelErr
-    ] = pyCheck.split(':::')
 
-    if (torchVer === 'none' || torchErr) {
-      details.torch = {
-        ok: false,
-        message: 'PyTorch is not installed in this environment',
-        details: torchErr || undefined,
-        fixHint: 'pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124'
-      }
-      details.cuda = {
-        ok: false,
-        message: 'PyTorch required to check CUDA availability'
-      }
-    } else {
-      details.torch = {
-        ok: true,
-        message: `PyTorch ${torchVer}`
-      }
-
-      if (cudaAvail === 'True') {
-        details.cuda = {
+  // Execute NVIDIA GPU check and Python probe concurrently
+  const checkNvidia = async (): Promise<void> => {
+    try {
+      const nvOut = await runCmd('nvidia-smi', ['--query-gpu=name', '--format=csv,noheader'], 3000)
+      if (nvOut) {
+        gpuName = nvOut.split('\n')[0].trim()
+        details.nvidia = {
           ok: true,
-          message: `CUDA ${cudaVer} available`
+          message: `NVIDIA GPU: ${gpuName}`
         }
       } else {
-        details.cuda = {
+        details.nvidia = {
           ok: false,
-          message: 'CUDA is not available in PyTorch (CPU-only build)',
-          fixHint:
-            'Reinstall PyTorch with CUDA support: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124'
+          message: 'No NVIDIA GPU detected via nvidia-smi',
+          fixHint: 'Verify NVIDIA GPU connection and proprietary drivers are installed.'
         }
       }
-    }
-
-    if (realesrganOk === 'True') {
-      details.realesrgan = {
-        ok: true,
-        message: 'Real-ESRGAN and basicsr packages ready'
-      }
-    } else {
-      details.realesrgan = {
+    } catch {
+      details.nvidia = {
         ok: false,
-        message: 'Real-ESRGAN or basicsr is not installed or failed to import',
-        details: realesrganErr || undefined,
-        fixHint: 'pip install basicsr realesrgan'
+        message: 'nvidia-smi not found or no NVIDIA driver installed',
+        fixHint: 'Install NVIDIA GPU proprietary display drivers.'
       }
-    }
-
-    if (spandrelOk === 'True') {
-      details.spandrel = {
-        ok: true,
-        message: 'spandrel model loader package ready'
-      }
-    } else {
-      details.spandrel = {
-        ok: false,
-        message: 'spandrel is not installed or failed to import',
-        details: spandrelErr || undefined,
-        fixHint: 'pip install spandrel'
-      }
-    }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    details.torch = {
-      ok: false,
-      message: `Failed to inspect PyTorch: ${msg}`,
-      fixHint: 'pip install torch torchvision'
-    }
-    details.cuda = { ok: false, message: 'Failed to inspect CUDA' }
-    details.realesrgan = {
-      ok: false,
-      message: 'Failed to inspect Real-ESRGAN',
-      fixHint: 'pip install basicsr realesrgan'
-    }
-    details.spandrel = {
-      ok: false,
-      message: 'Failed to inspect spandrel',
-      fixHint: 'pip install spandrel'
     }
   }
+
+  const checkPython = async (): Promise<void> => {
+    try {
+      const pyCheck = await runCmd(pythonCmd, ['-c', unifiedScript], 8000)
+      const parts = pyCheck.split(':::')
+      if (parts.length < 9) {
+        throw new Error(`Invalid output from Python environment check: ${pyCheck}`)
+      }
+
+      const [
+        pyVer,
+        torchVer,
+        cudaAvail,
+        cudaVer,
+        realesrganOk,
+        spandrelOk,
+        torchErr,
+        realesrganErr,
+        spandrelErr
+      ] = parts
+
+      detectedVersion = pyVer
+      const vParts = pyVer.split('.').map((p) => parseInt(p, 10))
+      const major = vParts[0] || 3
+      const minor = vParts[1] || 0
+
+      const sourceTag =
+        pythonResolution.source === 'bundled'
+          ? ' (bundled)'
+          : pythonResolution.source === 'auto-venv'
+            ? ' (auto-detected venv)'
+            : pythonResolution.source === 'custom'
+              ? ' (custom)'
+              : ''
+
+      details.python = {
+        ok: true,
+        message: `Python ${pyVer}${sourceTag} at ${pythonCmd}`
+      }
+
+      if (major === 3 && minor > 12) {
+        details.python.warning = true
+        details.python.warningMessage = `Python ${major}.${minor} may not be supported by PyTorch / Real-ESRGAN packages. Use a Python 3.11 or 3.12 virtualenv.`
+      }
+
+      if (torchVer === 'none' || torchErr) {
+        details.torch = {
+          ok: false,
+          message: 'PyTorch is not installed in this environment',
+          details: torchErr || undefined,
+          fixHint:
+            'pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124'
+        }
+        details.cuda = {
+          ok: false,
+          message: 'PyTorch required to check CUDA availability'
+        }
+      } else {
+        details.torch = {
+          ok: true,
+          message: `PyTorch ${torchVer}`
+        }
+
+        if (cudaAvail === 'True') {
+          details.cuda = {
+            ok: true,
+            message: `CUDA ${cudaVer} available`
+          }
+        } else {
+          details.cuda = {
+            ok: false,
+            message: 'CUDA is not available in PyTorch (CPU-only build)',
+            fixHint:
+              'Reinstall PyTorch with CUDA support: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124'
+          }
+        }
+      }
+
+      if (realesrganOk === 'True') {
+        details.realesrgan = {
+          ok: true,
+          message: 'Real-ESRGAN and basicsr packages ready'
+        }
+      } else {
+        details.realesrgan = {
+          ok: false,
+          message: 'Real-ESRGAN or basicsr is not installed or failed to import',
+          details: realesrganErr || undefined,
+          fixHint: 'pip install basicsr realesrgan'
+        }
+      }
+
+      if (spandrelOk === 'True') {
+        details.spandrel = {
+          ok: true,
+          message: 'spandrel model loader package ready'
+        }
+      } else {
+        details.spandrel = {
+          ok: false,
+          message: 'spandrel is not installed or failed to import',
+          details: spandrelErr || undefined,
+          fixHint: 'pip install spandrel'
+        }
+      }
+    } catch {
+      details.python = {
+        ok: false,
+        message: `Python not executable at "${pythonCmd}". Set a valid virtualenv path in Settings.`,
+        fixHint: 'Create a Python 3.11 or 3.12 virtualenv or specify custom path.'
+      }
+      details.torch = {
+        ok: false,
+        message: 'Python not found',
+        fixHint: 'Configure a valid Python environment first.'
+      }
+      details.cuda = { ok: false, message: 'Python not found' }
+      details.realesrgan = { ok: false, message: 'Python not found' }
+      details.spandrel = { ok: false, message: 'Python not found' }
+    }
+  }
+
+  await Promise.all([checkNvidia(), checkPython()])
 
   const isAvailable =
     details.nvidia.ok &&
@@ -423,7 +418,7 @@ print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}:::{spandrel_ok
     details.spandrel.ok &&
     details.script.ok
 
-  return {
+  const result: PyTorchDetection = {
     available: isAvailable,
     gpuName,
     pythonInfo: {
@@ -433,4 +428,12 @@ print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}:::{spandrel_ok
     },
     details
   }
+
+  cachedDetection = {
+    result,
+    timestamp: Date.now(),
+    key: cacheKey
+  }
+
+  return result
 }

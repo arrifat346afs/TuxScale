@@ -11,6 +11,14 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!resources/**/*'
+  - '!screenshots/**/*'
+  - '!scripts/**/*'
+  - '!flatpak/**/*'
+  - '!*.png'
+  - '!*.yml'
+  - '!*.xml'
+  - '!*.desktop'
 
 extraResources:
   - from: resources/linux/bin
