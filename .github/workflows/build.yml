@@ -25,6 +25,10 @@ jobs:
         with:
           node-version: 22
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Install system dependencies
         run: |
           sudo apt-get update

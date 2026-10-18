@@ -43,6 +43,10 @@
       },
     },
   },
+  "trustedDependencies": [
+    "electron",
+    "esbuild",
+  ],
   "overrides": {
     "strip-ansi": "^6.0.1",
   },
