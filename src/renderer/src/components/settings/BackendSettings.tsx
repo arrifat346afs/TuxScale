@@ -36,7 +36,7 @@ const SETUP_COMMANDS = `python3.12 -m venv ~/.venvs/tuxscale
 source ~/.venvs/tuxscale/bin/activate
 pip install --upgrade pip setuptools wheel
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
-pip install basicsr realesrgan --no-build-isolation`
+pip install basicsr realesrgan spandrel --no-build-isolation`
 
 export const BackendSettings: React.FC<BackendSettingsProps> = ({
   backend,

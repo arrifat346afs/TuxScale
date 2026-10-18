@@ -268,10 +268,6 @@ def run_image_upscaling():
         log("ERROR: CUDA is not available. PyTorch backend requires an NVIDIA GPU with CUDA.")
         sys.exit(1)
 
-    if args.model not in MODEL_REGISTRY:
-        log(f"ERROR: Unsupported model '{args.model}'. Available models: {list(MODEL_REGISTRY.keys())}")
-        sys.exit(1)
-
     device = torch.device('cuda:0')
     weights_dir = args.weights_dir or get_default_weights_dir()
     model_path = download_weights(args.model, weights_dir, log_fn=log)
@@ -281,25 +277,26 @@ def run_image_upscaling():
         tile_size = 512
 
     half = not args.fp32
-    log(f"[PyTorch] Loading Real-ESRGAN model '{args.model}' (scale={args.scale}x, tile={tile_size}, half={half})...")
+    log(f"[PyTorch] Loading model '{args.model}' (scale={args.scale}x, tile={tile_size}, half={half})...")
 
     try:
-        model = load_model(
+        model, net_scale, half = load_model(
             model_name=args.model,
             weights_path=model_path,
             device=device,
             half=half,
-            channels_last=True
+            channels_last=True,
+            log_fn=log
         )
     except Exception as e:
-        log(f"ERROR: Failed to load model: {e}")
+        log(f"ERROR: could not load {args.model}: {e}")
         sys.exit(1)
 
     gpu_upscaler = GpuUpscaler(
         model=model,
         device=device,
         target_scale=args.scale,
-        net_scale=MODEL_REGISTRY[args.model]['netscale'],
+        net_scale=net_scale,
         tile_size=tile_size,
         half=half,
         channels_last=True,

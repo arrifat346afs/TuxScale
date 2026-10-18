@@ -63,10 +63,6 @@ def main():
         log(f"ERROR: Input video not found: {args.input}")
         sys.exit(1)
 
-    if args.model not in MODEL_REGISTRY:
-        log(f"ERROR: Unsupported model '{args.model}'. Available models: {list(MODEL_REGISTRY.keys())}")
-        sys.exit(1)
-
     if not torch.cuda.is_available():
         log("ERROR: CUDA is not available. PyTorch backend requires an NVIDIA GPU with CUDA.")
         sys.exit(1)
@@ -94,25 +90,31 @@ def main():
         tile_size = 512
 
     half = (not args.fp32)
-    log(f"Loading Real-ESRGAN model '{args.model}' (tile={tile_size}, half={half}, channels_last=True)...")
+    log(f"Loading PyTorch model '{args.model}' (tile={tile_size}, half={half}, channels_last=True)...")
 
     try:
-        model = load_model(
+        model, net_scale, half = load_model(
             model_name=args.model,
             weights_path=model_path,
             device=device,
             half=half,
-            channels_last=True
+            channels_last=True,
+            log_fn=log
         )
     except Exception as e:
-        log(f"ERROR: Failed to load model: {e}")
+        log(f"ERROR: could not load {args.model}: {e}")
         sys.exit(1)
+
+    arch_id = getattr(getattr(model, 'architecture', None), 'id', '')
+    reg_info = MODEL_REGISTRY.get(args.model)
+    if (reg_info and reg_info.get('kind') == 'image-only') or 'DAT' in arch_id or 'Transformer' in arch_id:
+        log(f"WARNING: Model '{args.model}' is a transformer/DAT architecture (Image only - slow). Video processing may be very slow.")
 
     gpu_upscaler = GpuUpscaler(
         model=model,
         device=device,
         target_scale=args.scale,
-        net_scale=MODEL_REGISTRY[args.model]['netscale'],
+        net_scale=net_scale,
         tile_size=tile_size,
         half=half,
         channels_last=True,

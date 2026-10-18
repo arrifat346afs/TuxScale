@@ -45,8 +45,17 @@ export function resolvePyTorchWeightsDir(modelName?: string): string {
   if (modelName) {
     const filename = `${modelName}.pth`
     for (const dir of candidates) {
-      if (fs.existsSync(path.join(dir, filename))) {
-        return dir
+      const candidate = path.join(dir, filename)
+      if (fs.existsSync(candidate)) {
+        try {
+          const stat = fs.statSync(candidate)
+          // Skip Git LFS pointer stubs (< 1MB) so search continues or downloads real weights
+          if (stat.size >= 1024 * 1024) {
+            return dir
+          }
+        } catch {
+          // Ignore
+        }
       }
     }
   }
@@ -61,7 +70,11 @@ export function resolvePyTorchWeightsDir(modelName?: string): string {
   return candidates[0] || path.join(app.getPath('userData'), 'models')
 }
 
-export const PYTORCH_MODELS = ['realesr-animevideov3']
+export const PYTORCH_MODELS = [
+  'realesr-animevideov3',
+  'realesr-general-wdn-x4v3',
+  '4x-UltraSharpV2'
+]
 
 export class PyTorchEngine implements Engine {
   readonly id = 'pytorch' as const

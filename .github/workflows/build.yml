@@ -12,6 +12,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Verify Git LFS model weights
+        run: |
+          for f in resources/models/*.pth; do
+            [ -e "$f" ] || continue
+            size=$(stat -c%s "$f")
+            if [ "$size" -lt 1048576 ]; then
+              echo "::error file=$f::Model weights file $f is smaller than 1 MB ($size bytes), likely an unfetched Git LFS pointer stub."
+              exit 1
+            fi
+            if head -n 1 "$f" | grep -q "^version https://git-lfs"; then
+              echo "::error file=$f::Model weights file $f starts with 'version https://git-lfs' (unfetched Git LFS pointer stub)."
+              exit 1
+            fi
+          done
+          echo "All model weights in resources/models/ verified successfully."
 
       - name: Maximize build disk space
         run: |

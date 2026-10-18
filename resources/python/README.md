@@ -26,10 +26,10 @@ Visit [PyTorch Get Started](https://pytorch.org/get-started/locally/) for your s
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 ```
 
-### 3. Install Real-ESRGAN and Dependencies
+### 3. Install Real-ESRGAN, Spandrel, and Dependencies
 
 ```bash
-pip install basicsr realesrgan numpy
+pip install basicsr realesrgan spandrel numpy
 ```
 
 > **Note on torchvision compatibility:**
@@ -40,7 +40,7 @@ pip install basicsr realesrgan numpy
 Run this check in your terminal:
 
 ```bash
-python3 -c "import torch, realesrgan; print('CUDA Available:', torch.cuda.is_available(), '| Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
+python3 -c "import torch, spandrel, realesrgan; print('CUDA Available:', torch.cuda.is_available(), '| Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
 ```
 
 ### 5. Configure TuxScale
@@ -55,11 +55,22 @@ python3 -c "import torch, realesrgan; print('CUDA Available:', torch.cuda.is_ava
 
 ## Model Weights
 
-Weights for `realesr-animevideov3` are automatically downloaded on first use to TuxScale's `userData` models directory (e.g. `~/.local/share/tuxscale/models/` or your OS app data directory).
+TuxScale uses `spandrel` for seamless architecture detection across models. Weights are automatically located from `resources/models`, project root `models/`, or downloaded on first use to TuxScale's `userData` models directory (e.g. `~/.local/share/tuxscale/models/` or your OS app data directory).
 
-If you are on an offline system, you can download `realesr-animevideov3.pth` directly and place it in the directory:
+Supported PyTorch models:
+
+- **`realesr-animevideov3`** (Real-ESRGAN Compact 16 convs, video & image)
+- **`realesr-general-wdn-x4v3`** (Real-ESRGAN Compact 32 convs, video & image)
+- **`4x-UltraSharpV2`** (DAT transformer architecture, image upscaling - slow on video)
+
+If you are on an offline system, you can download weights directly and place them in `~/.local/share/tuxscale/models/`:
 
 ```bash
 mkdir -p ~/.local/share/tuxscale/models/
+# realesr-animevideov3
 wget -O ~/.local/share/tuxscale/models/realesr-animevideov3.pth https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth
+# realesr-general-wdn-x4v3
+wget -O ~/.local/share/tuxscale/models/realesr-general-wdn-x4v3.pth https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
+# 4x-UltraSharpV2
+wget -O ~/.local/share/tuxscale/models/4x-UltraSharpV2.pth https://huggingface.co/Kim2091/UltraSharpV2/resolve/main/4x-UltraSharpV2.pth
 ```

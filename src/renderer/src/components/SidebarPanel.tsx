@@ -27,7 +27,8 @@ import {
   XCircle,
   FileVideo,
   FileImage,
-  Download
+  Download,
+  AlertTriangle
 } from 'lucide-react'
 import type {
   SystemInfo,
@@ -92,6 +93,24 @@ type SidebarPanelProps = {
   updateInfo: { version?: string; percent?: number; error?: string }
   onCheckForUpdates: () => void
   onInstallUpdate: () => void
+}
+
+const isDatOrTransformerModel = (name: string): boolean => {
+  const lower = (name || '').toLowerCase()
+  return (
+    lower.includes('dat') ||
+    lower.includes('ultrasharpv2') ||
+    lower.includes('transformer') ||
+    lower === '4x-ultrasharpv2'
+  )
+}
+
+const formatModelDisplayName = (name: string): string => {
+  const formatted = name.replace(/-/g, ' ').toUpperCase()
+  if (isDatOrTransformerModel(name)) {
+    return `${formatted} (Image only - slow)`
+  }
+  return formatted
 }
 
 export const SidebarPanel = ({
@@ -245,19 +264,29 @@ export const SidebarPanel = ({
 
                 <Select value={model} onValueChange={onModelChange} disabled={isProcessing}>
                   <SelectTrigger className="w-full">
-                    <div className="flex items-center gap-2">
-                      <Layers className="size-4 text-primary" />
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Layers className="size-4 text-primary shrink-0" />
                       <SelectValue placeholder="Select a model" />
                     </div>
                   </SelectTrigger>
                   <SelectContent>
                     {models.map((modelName) => (
                       <SelectItem key={modelName} value={modelName}>
-                        {modelName.replace(/-/g, ' ').toUpperCase()}
+                        {formatModelDisplayName(modelName)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+
+                {upscaleMode === 'video' && isDatOrTransformerModel(model) && (
+                  <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-2.5 text-xs text-amber-500 border border-amber-500/20">
+                    <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">
+                      <strong>{model}</strong> is a transformer/DAT architecture and is very slow
+                      for video upscaling. Image mode is recommended.
+                    </span>
+                  </div>
+                )}
 
                 {activeBackend === 'ncnn' ? (
                   <div className="space-y-2">

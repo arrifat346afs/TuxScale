@@ -43,28 +43,45 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 try:
-    from realesrgan.archs.srvgg_arch import SRVGGNetCompact
+    from spandrel import ModelLoader, ImageModelDescriptor
 except ImportError:
-    try:
-        from basicsr.archs.srvgg_arch import SRVGGNetCompact
-    except ImportError:
-        SRVGGNetCompact = None
+    ModelLoader = None
+    ImageModelDescriptor = None
 
 
 MODEL_REGISTRY: Dict[str, Dict[str, Any]] = {
     'realesr-animevideov3': {
         'url': 'https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth',
-        'netscale': 4,
-        'build_model': lambda: SRVGGNetCompact(
-            num_in_ch=3,
-            num_out_ch=3,
-            num_feat=64,
-            num_conv=16,
-            upscale=4,
-            act_type='prelu'
-        )
+        'display_name': 'Real-ESRGAN AnimeVideo v3',
+        'kind': 'video+image'
+    },
+    'realesr-general-wdn-x4v3': {
+        'url': 'https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth',
+        'display_name': 'Real-ESRGAN General WDN v3',
+        'kind': 'video+image'
+    },
+    '4x-UltraSharpV2': {
+        'url': 'https://huggingface.co/Kim2091/UltraSharpV2/resolve/main/4x-UltraSharpV2.pth',
+        'display_name': '4x-UltraSharpV2',
+        'kind': 'image-only'
     }
 }
+
+
+def is_lfs_pointer(filepath: str) -> bool:
+    """Check if file is a Git LFS pointer stub instead of actual model weights."""
+    try:
+        if not os.path.isfile(filepath):
+            return False
+        # Git LFS pointer stubs are ~130 bytes; actual model weights are > 1MB
+        if os.path.getsize(filepath) < 1024 * 1024:
+            with open(filepath, 'rb') as f:
+                header = f.read(100)
+                if header.startswith(b'version https://git-lfs'):
+                    return True
+    except Exception:
+        pass
+    return False
 
 
 def get_weights_search_dirs(weights_dir: Optional[str] = None) -> list:
@@ -120,17 +137,12 @@ def get_default_weights_dir() -> str:
 
 
 def download_weights(model_name: str, weights_dir: Optional[str] = None, log_fn: Optional[Callable[[str], None]] = None) -> str:
-    """Download or locate model weights. Checks project root and resources/models first."""
+    """Download or locate model weights. Checks candidate directories first."""
     def _log(msg: str):
         if log_fn:
             log_fn(msg)
         else:
             print(msg, file=sys.stderr, flush=True)
-
-    info = MODEL_REGISTRY.get(model_name)
-    if not info:
-        _log(f"ERROR: Unknown model '{model_name}'. Available: {list(MODEL_REGISTRY.keys())}")
-        sys.exit(1)
 
     target_filename = f"{model_name}.pth"
     search_dirs = get_weights_search_dirs(weights_dir)
@@ -139,10 +151,19 @@ def download_weights(model_name: str, weights_dir: Optional[str] = None, log_fn:
     for d in search_dirs:
         candidate = os.path.join(d, target_filename)
         if os.path.exists(candidate):
+            if is_lfs_pointer(candidate):
+                _log(f"WARNING: '{candidate}' is a Git LFS pointer stub (~{os.path.getsize(candidate)} bytes), skipping and continuing search...")
+                continue
             _log(f"Using model weights: {candidate}")
             return candidate
 
-    # 2. If not found, select first writable target directory to download
+    # 2. If not found on disk, check if it can be downloaded via MODEL_REGISTRY
+    info = MODEL_REGISTRY.get(model_name)
+    if not info:
+        _log(f"ERROR: could not load {model_name}: weights not found on disk and not in MODEL_REGISTRY")
+        sys.exit(1)
+
+    # 3. Select first writable target directory to download
     dest_dir = None
     if weights_dir:
         try:
@@ -175,7 +196,7 @@ def download_weights(model_name: str, weights_dir: Optional[str] = None, log_fn:
     filepath = os.path.join(dest_dir, target_filename)
 
     url = info['url']
-    _log(f"Model weights '{target_filename}' not found in project or cache directories.")
+    _log(f"Model weights '{target_filename}' not found on disk.")
     _log(f"Downloading {model_name}...")
     _log(f"Download URL: {url}")
     _log(f"Destination: {filepath}")
@@ -183,7 +204,7 @@ def download_weights(model_name: str, weights_dir: Optional[str] = None, log_fn:
     tmp_path = filepath + '.tmp'
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'TuxScale/1.0'})
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=120) as resp:
             total_size = int(resp.headers.get('Content-Length', 0))
             downloaded = 0
             block_size = 65536
@@ -207,7 +228,7 @@ def download_weights(model_name: str, weights_dir: Optional[str] = None, log_fn:
                 os.remove(tmp_path)
             except OSError:
                 pass
-        _log(f"ERROR: Failed to download model weights: {err}")
+        _log(f"ERROR: could not load {model_name}: download failed ({err})")
         _log("If you are offline, download the weights manually and place them in the directory:")
         _log(f"  URL: {url}")
         _log(f"  Destination: {filepath}")
@@ -219,44 +240,59 @@ def load_model(
     weights_path: str,
     device: torch.device,
     half: bool = True,
-    channels_last: bool = True
-) -> nn.Module:
-    """Build and load weights into the model, setting eval mode and precision."""
-    if model_name not in MODEL_REGISTRY:
-        raise ValueError(f"Unknown model: {model_name}")
+    channels_last: bool = True,
+    log_fn: Optional[Callable[[str], None]] = None
+) -> Tuple[Any, int, bool]:
+    """
+    Build and load weights into the model using spandrel ModelLoader.
+    Detects architecture automatically from weights file.
+    Returns (descriptor, scale, half_precision_used).
+    """
+    def _log(msg: str):
+        if log_fn:
+            log_fn(msg)
+        else:
+            print(msg, file=sys.stderr, flush=True)
 
     torch.backends.cudnn.benchmark = True
 
-    model = MODEL_REGISTRY[model_name]['build_model']()
-    loadnet = torch.load(weights_path, map_location='cpu', weights_only=True)
-    if 'params_ema' in loadnet:
-        keyname = 'params_ema'
-    elif 'params' in loadnet:
-        keyname = 'params'
-    else:
-        keyname = None
+    try:
+        from spandrel import ModelLoader
+        loader = ModelLoader()
+        descriptor = loader.load_from_file(weights_path)
+    except Exception as e:
+        raise RuntimeError(str(e)) from e
 
-    state_dict = loadnet[keyname] if keyname else loadnet
-    model.load_state_dict(state_dict, strict=True)
-    model.eval()
+    scale = getattr(descriptor, 'scale', 4)
+    descriptor = descriptor.eval()
 
+    supports_half = getattr(descriptor, 'supports_half', False)
+    use_half = False
     if half:
-        model = model.half()
+        if supports_half:
+            descriptor = descriptor.half()
+            use_half = True
+        else:
+            descriptor = descriptor.float()
+            use_half = False
+            _log(f"Model '{model_name}' does not support FP16 half-precision; falling back to FP32.")
     else:
-        model = model.float()
+        descriptor = descriptor.float()
+        use_half = False
 
-    model = model.to(device=device)
+    descriptor = descriptor.to(device=device)
+
     if channels_last:
         try:
-            model = model.to(memory_format=torch.channels_last)
+            descriptor.model.to(memory_format=torch.channels_last)
         except Exception:
             pass
 
-    return model
+    return descriptor, scale, use_half
 
 
 def forward_tiled_gpu(
-    model: nn.Module,
+    model: Any,
     x: torch.Tensor,
     tile_size: int = 512,
     tile_pad: int = 10,
@@ -304,7 +340,7 @@ class GpuUpscaler:
 
     def __init__(
         self,
-        model: nn.Module,
+        model: Any,
         device: torch.device,
         target_scale: int = 4,
         net_scale: int = 4,

@@ -76,15 +76,16 @@ Input Image ──► Read & EXIF Orientation ──► AI Super-Resolution (ncn
 
 ## Supported Formats
 
-| Category | Input Formats | Export Formats |
-|---|---|---|
-| **Images** | PNG, JPG, JPEG, WEBP, BMP, TIFF | PNG (lossless), JPG, WEBP (with quality slider) |
-| **Videos** | MP4, WebM, MKV, AVI, MOV, FLV, WMV, TS, M4V | MP4, MKV, WebM, MOV, AVI |
+| Category   | Input Formats                               | Export Formats                                  |
+| ---------- | ------------------------------------------- | ----------------------------------------------- |
+| **Images** | PNG, JPG, JPEG, WEBP, BMP, TIFF             | PNG (lossless), JPG, WEBP (with quality slider) |
+| **Videos** | MP4, WebM, MKV, AVI, MOV, FLV, WMV, TS, M4V | MP4, MKV, WebM, MOV, AVI                        |
 
 ---
 
 ## Prerequisites
 
+- **Git & Git LFS** — Git LFS is required when cloning the repository to pull the model weights in `resources/models/`.
 - **FFmpeg & ffprobe** — Required for video frame extraction and reassembly.
 - **Vulkan Driver** — Required for the ncnn/Vulkan engine (compatible with AMD, Intel, and NVIDIA GPUs).
 - **NVIDIA GPU & CUDA (Optional)** — Required only if using the PyTorch CUDA engine backend.
@@ -92,6 +93,14 @@ Input Image ──► Read & EXIF Orientation ──► AI Super-Resolution (ncn
 ---
 
 ## Project Setup
+
+### Clone Repository (Requires Git LFS)
+
+```bash
+git lfs install
+git clone https://github.com/arrifat346afs/TuxScale.git
+cd TuxScale
+```
 
 ### Install Dependencies
 
@@ -138,24 +147,26 @@ The repository includes a GitHub Actions workflow (`.github/workflows/build.yml`
 
 The workflow uses Bun to build the application and packages all four Linux formats (AppImage, deb, rpm, pacman) directly into GitHub Releases.
 
+> **Note on Git LFS & CI Bandwidth:**
+> Model weights in `resources/models/*.pth` (~147 MB total) are tracked with Git LFS, requiring `lfs: true` in CI checkout and downloading ~147 MB per CI run. An effective alternative to track in future releases is downloading weights on first run / lazy-loading at runtime, or attaching weights to a GitHub release and downloading them during packaging instead of tracking binary weights inside Git LFS.
+
 ---
 
 ## Tech Stack
 
-| Category | Technology |
-|---|---|
-| **Desktop Framework** | [Electron](https://www.electronjs.org/) |
-| **Frontend** | [React](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/) |
-| **Package Manager** | [Bun](https://bun.sh/) |
-| **Build Tooling** | [electron-vite](https://electron-vite.org/) / [Vite](https://vitejs.dev/) |
-| **Packaging** | [electron-builder](https://www.electron.build/) |
-| **Styling & UI** | [Tailwind CSS v4](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) |
+| Category              | Technology                                                                                                |
+| --------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Desktop Framework** | [Electron](https://www.electronjs.org/)                                                                   |
+| **Frontend**          | [React](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/)                             |
+| **Package Manager**   | [Bun](https://bun.sh/)                                                                                    |
+| **Build Tooling**     | [electron-vite](https://electron-vite.org/) / [Vite](https://vitejs.dev/)                                 |
+| **Packaging**         | [electron-builder](https://www.electron.build/)                                                           |
+| **Styling & UI**      | [Tailwind CSS v4](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)                         |
 | **Inference Engines** | [upscayl-ncnn](https://github.com/upscayl/upscayl-ncnn) (Vulkan) & [PyTorch](https://pytorch.org/) (CUDA) |
-| **Image Comparison** | [react-compare-slider](https://github.com/nerdyman/react-compare-slider) |
+| **Image Comparison**  | [react-compare-slider](https://github.com/nerdyman/react-compare-slider)                                  |
 
 ---
 
 ## Credits
 
 TuxScale is inspired by and builds upon the fantastic work of [Upscayl](https://github.com/upscayl/upscayl) — the #1 free and open-source AI image upscaler. Special thanks to the Upscayl team for their backend ([upscayl-ncnn](https://github.com/upscayl/upscayl-ncnn)) and inspiration.
-

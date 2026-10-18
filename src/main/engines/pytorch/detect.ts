@@ -19,6 +19,7 @@ export type PyTorchDetection = {
     torch: StatusCheckItem
     cuda: StatusCheckItem
     realesrgan: StatusCheckItem
+    spandrel: StatusCheckItem
     script: StatusCheckItem
   }
 }
@@ -151,6 +152,7 @@ export async function detectPyTorch(customPythonPath?: string): Promise<PyTorchD
     torch: { ok: false, message: 'Checking PyTorch...' },
     cuda: { ok: false, message: 'Checking CUDA...' },
     realesrgan: { ok: false, message: 'Checking Real-ESRGAN and basicsr...' },
+    spandrel: { ok: false, message: 'Checking spandrel...' },
     script: { ok: false, message: 'Checking worker script...' }
   }
 
@@ -241,6 +243,7 @@ export async function detectPyTorch(customPythonPath?: string): Promise<PyTorchD
     }
     details.cuda = { ok: false, message: 'Python not found' }
     details.realesrgan = { ok: false, message: 'Python not found' }
+    details.spandrel = { ok: false, message: 'Python not found' }
 
     return {
       available: false,
@@ -254,7 +257,7 @@ export async function detectPyTorch(customPythonPath?: string): Promise<PyTorchD
     }
   }
 
-  // 4. Real imports for PyTorch, CUDA, basicsr, and realesrgan
+  // 4. Real imports for PyTorch, CUDA, basicsr, realesrgan, and spandrel
   try {
     const checkScript = `
 import sys
@@ -300,11 +303,29 @@ try:
 except Exception as e:
     realesrgan_err = str(e)
 
-print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}:::{torch_err}:::{realesrgan_err}")
+# Check spandrel import
+spandrel_ok = False
+spandrel_err = ""
+try:
+    import spandrel
+    from spandrel import ModelLoader
+    spandrel_ok = True
+except Exception as e:
+    spandrel_err = str(e)
+
+print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}:::{spandrel_ok}:::{torch_err}:::{realesrgan_err}:::{spandrel_err}")
 `
     const pyCheck = await runCmd(pythonCmd, ['-c', checkScript], 10000)
-    const [torchVer, cudaAvail, cudaVer, realesrganOk, torchErr, realesrganErr] =
-      pyCheck.split(':::')
+    const [
+      torchVer,
+      cudaAvail,
+      cudaVer,
+      realesrganOk,
+      spandrelOk,
+      torchErr,
+      realesrganErr,
+      spandrelErr
+    ] = pyCheck.split(':::')
 
     if (torchVer === 'none' || torchErr) {
       details.torch = {
@@ -351,6 +372,20 @@ print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}:::{torch_err}:
         fixHint: 'pip install basicsr realesrgan'
       }
     }
+
+    if (spandrelOk === 'True') {
+      details.spandrel = {
+        ok: true,
+        message: 'spandrel model loader package ready'
+      }
+    } else {
+      details.spandrel = {
+        ok: false,
+        message: 'spandrel is not installed or failed to import',
+        details: spandrelErr || undefined,
+        fixHint: 'pip install spandrel'
+      }
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     details.torch = {
@@ -364,6 +399,11 @@ print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}:::{torch_err}:
       message: 'Failed to inspect Real-ESRGAN',
       fixHint: 'pip install basicsr realesrgan'
     }
+    details.spandrel = {
+      ok: false,
+      message: 'Failed to inspect spandrel',
+      fixHint: 'pip install spandrel'
+    }
   }
 
   const isAvailable =
@@ -372,6 +412,7 @@ print(f"{torch_ver}:::{cuda_avail}:::{cuda_ver}:::{realesrgan_ok}:::{torch_err}:
     details.torch.ok &&
     details.cuda.ok &&
     details.realesrgan.ok &&
+    details.spandrel.ok &&
     details.script.ok
 
   return {

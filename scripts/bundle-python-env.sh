@@ -50,10 +50,10 @@ echo "==> Installing PyTorch and torchvision with CUDA 12.4..."
   torch torchvision \
   --index-url https://download.pytorch.org/whl/cu124
 
-# 4. Install Real-ESRGAN, basicsr, and numpy
-echo "==> Installing Real-ESRGAN, basicsr, and dependencies..."
+# 4. Install Real-ESRGAN, basicsr, spandrel, and numpy
+echo "==> Installing Real-ESRGAN, basicsr, spandrel, and dependencies..."
 "$PYTHON_BIN" -m pip install --no-cache-dir \
-  basicsr realesrgan numpy \
+  basicsr realesrgan spandrel numpy \
   --no-build-isolation
 
 # 4b. Patch BasicSR compatibility with modern torchvision (torchvision >= 0.17 removed functional_tensor)
@@ -85,14 +85,15 @@ EOF
 
 # 5. Verify installation
 echo "==> Verifying bundled Python packages..."
-"$PYTHON_BIN" -c "import torch, torchvision, realesrgan, basicsr, numpy; print('✓ Bundled Python verification passed: Torch', torch.__version__, '| CUDA:', torch.version.cuda)"
+"$PYTHON_BIN" -c "import torch, torchvision, realesrgan, basicsr, spandrel, numpy; print('✓ Bundled Python verification passed: Torch', torch.__version__, '| CUDA:', torch.version.cuda)"
 "$PYTHON_BIN" -c "from basicsr.data.degradations import rgb_to_grayscale; print('✓ BasicSR degradations import verified')"
+"$PYTHON_BIN" -c "from spandrel import ModelLoader; print('✓ Spandrel ModelLoader import verified')"
 "$PYTHON_BIN" "$ROOT_DIR/resources/python/tuxscale_upscale.py" --help > /dev/null
 echo "✓ Verified tuxscale_upscale.py entrypoint execution"
 
 # 6. Download default PyTorch model weights (realesr-animevideov3.pth)
 WEIGHTS_PATH="$MODELS_DIR/realesr-animevideov3.pth"
-if [ ! -f "$WEIGHTS_PATH" ]; then
+if [ ! -f "$WEIGHTS_PATH" ] || [ "$(stat -c%s "$WEIGHTS_PATH")" -lt 1048576 ] || head -n 1 "$WEIGHTS_PATH" | grep -q "^version https://git-lfs"; then
   echo "==> Downloading default PyTorch model (realesr-animevideov3.pth)..."
   curl -sfL -o "$WEIGHTS_PATH" \
     "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3.pth"
