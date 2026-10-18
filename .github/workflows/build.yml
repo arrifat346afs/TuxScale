@@ -126,16 +126,16 @@ jobs:
           done
 
           if [ "$SPLIT_OCCURRED" -eq 1 ]; then
-            cat << 'EOF' > release-assets/HOW_TO_JOIN_SPLIT_ASSETS.txt
-To rejoin any multi-part release asset (e.g. .part01, .part02):
-
-Linux / macOS:
-  cat <filename>.part* > <filename>
-  chmod +x <filename>   # if AppImage
-
-Windows (Command Prompt):
-  copy /b <filename>.part01 + <filename>.part02 <filename>
-EOF
+            printf "%s\n" \
+              "To rejoin any multi-part release asset (e.g. .part01, .part02):" \
+              "" \
+              "Linux / macOS:" \
+              "  cat <filename>.part* > <filename>" \
+              "  chmod +x <filename>   # if AppImage" \
+              "" \
+              "Windows (Command Prompt):" \
+              "  copy /b <filename>.part01 + <filename>.part02 <filename>" \
+              > release-assets/HOW_TO_JOIN_SPLIT_ASSETS.txt
           fi
 
           echo "==> Final list of release assets to upload:"
