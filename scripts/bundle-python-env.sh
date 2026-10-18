@@ -102,28 +102,10 @@ else
   echo "Model weights already present at: $WEIGHTS_PATH"
 fi
 
-# 7. Aggressively clean up unneeded files and libraries to minimize package size
-echo "==> Cleaning unneeded files to optimize package size..."
-
-# Remove unused NVIDIA CUDA 12 packages (not required for Real-ESRGAN/Spandrel vision CNN & transformer inference)
-# - nccl: multi-GPU distributed training (~350MB)
-# - cusparse: sparse matrix operations (~450MB)
-# - cusolver: dense linear solvers (~350MB)
-# - cufft: fast Fourier transforms (~400MB)
-# - curand: random number generation (~150MB)
-# - cupti: profiling tools (~50MB)
-# - triton: JIT compiler for torch.compile (~200MB)
-# - libcudnn_adv: recurrent neural networks (~200MB)
-rm -rf "$SITE_PACKAGES/nvidia/nccl" "$SITE_PACKAGES/nvidia_nccl_cu12"* 2>/dev/null || true
-rm -rf "$SITE_PACKAGES/nvidia/cusparse" "$SITE_PACKAGES/nvidia_cusparse_cu12"* 2>/dev/null || true
-rm -rf "$SITE_PACKAGES/nvidia/cusolver" "$SITE_PACKAGES/nvidia_cusolver_cu12"* 2>/dev/null || true
-rm -rf "$SITE_PACKAGES/nvidia/cufft" "$SITE_PACKAGES/nvidia_cufft_cu12"* 2>/dev/null || true
-rm -rf "$SITE_PACKAGES/nvidia/curand" "$SITE_PACKAGES/nvidia_curand_cu12"* 2>/dev/null || true
-rm -rf "$SITE_PACKAGES/nvidia/cupti" "$SITE_PACKAGES/nvidia_cuda_cupti_cu12"* 2>/dev/null || true
-rm -rf "$SITE_PACKAGES/nvidia/cudnn/lib/libcudnn_adv.so"* 2>/dev/null || true
-rm -rf "$SITE_PACKAGES/triton"* 2>/dev/null || true
-
-# Remove C++ headers, test fixtures, documentation, and unused binaries
+# 7. Clean up unneeded files to optimize package size
+# NOTE: All NVIDIA CUDA shared libraries (.so) are strictly preserved because
+# libtorch_cuda.so has explicit DT_NEEDED dynamic link dependencies on them
+# (e.g. libnccl.so.2, libcusparse.so.12, libcufft.so.11, libcurand.so.10, libcudnn.so.9).
 rm -rf "$TARGET_DIR/include"
 rm -rf "$TARGET_DIR/share"
 rm -rf "$SITE_PACKAGES/torch/include"
