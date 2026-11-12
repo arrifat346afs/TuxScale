@@ -60,7 +60,7 @@ bash app/scripts/package-linux.sh
 
 This creates `app/dist/TuxScale.AppDir`. If `appimagetool` is installed, it also creates an AppImage. The AppDir contains the native executable, model files, NCNN binary, Python workers, desktop metadata, and licenses. An existing bundled Python environment is included when present; otherwise, an installed environment is used. FFmpeg and the required graphics/system libraries must be available on the destination system.
 
-GitHub Actions builds and tests the Rust application and uploads a Linux AppDir archive. It does not publish a release automatically.
+GitHub Actions builds and tests the Rust application and uploads a Linux AppDir archive. A manual **Run workflow** or a matching version tag also publishes that archive on the GitHub Releases page. The release tag follows the version in `app/Cargo.toml`; rerunning the workflow for the same version replaces its archive.
 
 ## Project structure
 
