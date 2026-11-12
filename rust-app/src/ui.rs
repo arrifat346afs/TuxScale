@@ -29,6 +29,8 @@ struct Menu {
 }
 #[derive(Default)]
 pub struct UiState {
+    pub(super) preview_open: bool,
+    layout: crate::layout::Layout,
     pub(super) preview: crate::preview::PreviewState,
     focus: Option<FocusHandle>,
     menu: Option<Menu>,
@@ -50,11 +52,18 @@ fn icon(name: &'static str, size: f32) -> impl IntoElement {
         .flex_shrink_0()
 }
 fn caption(text: impl Into<SharedString>) -> Div {
-    div().text_xs().text_color(rgb(MUTED)).child(text.into())
+    div()
+        .min_w_0()
+        .overflow_hidden()
+        .text_xs()
+        .text_color(rgb(MUTED))
+        .child(text.into())
 }
 fn panel() -> Div {
     div()
         .w_full()
+        .min_w_0()
+        .flex_shrink_0()
         .flex()
         .flex_col()
         .gap_3()
@@ -74,6 +83,8 @@ fn button(
         .id(label)
         .w_full()
         .h(logical(36.))
+        .min_w_0()
+        .flex_shrink_0()
         .flex()
         .items_center()
         .justify_center()
@@ -233,6 +244,8 @@ impl TuxScale {
                     }
                 }))
                 .h(logical(40.))
+                .min_w_0()
+                .flex_shrink_0()
                 .w_full()
                 .px_3()
                 .flex()
@@ -266,6 +279,7 @@ impl TuxScale {
                 .child(
                     div()
                         .flex_1()
+                        .min_w_0()
                         .overflow_hidden()
                         .text_ellipsis()
                         .child(label),
@@ -276,8 +290,8 @@ impl TuxScale {
             let menu_view =
                 div()
                     .id("select-options")
-                    .w(logical(268.))
-                    .max_h(logical(280.))
+                    .w(px(self.ui.layout.popup_width))
+                    .max_h(px(self.ui.layout.popup_height))
                     .overflow_y_scroll()
                     .p_1()
                     .rounded_xl()
@@ -310,7 +324,14 @@ impl TuxScale {
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 this.select_option(field, &value, cx)
                             }))
-                            .child(label.clone())
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .overflow_hidden()
+                                    .text_ellipsis()
+                                    .child(label.clone()),
+                            )
                             .when(i == selected, |d| d.child(icon("check", 14.)))
                     }));
             container = container.child(
@@ -772,6 +793,14 @@ impl Render for TuxScale {
             window.focus(&f);
             self.ui.focus = Some(f);
         }
+        let viewport = window.viewport_size();
+        let layout = crate::layout::Layout::new(
+            f32::from(viewport.width),
+            f32::from(viewport.height),
+            self.interface_scale,
+        );
+        self.ui.layout = layout;
+        let compact = layout.compact;
         let image = self.mode == Mode::Image;
         let settings = self.page == Page::Settings;
         let controls = if settings {
@@ -809,7 +838,9 @@ impl Render for TuxScale {
             )
             .track_focus(self.ui.focus.as_ref().unwrap())
             .size_full()
+            .overflow_hidden()
             .flex()
+            .when(compact, |d|d.flex_col())
             .bg(rgb(BG))
             .text_color(rgb(TEXT))
             .font_family("Geist")
@@ -855,14 +886,19 @@ impl Render for TuxScale {
                 }
                 cx.notify();
             }))
+            .when(compact, |d|d.child(div().w_full().flex().flex_shrink_0().gap_2().px_3().py_2().bg(rgb(CARD))
+                .child(tab("Controls", !self.ui.preview_open, cx.listener(|this,_,_,cx|{this.ui.preview_open=false;this.ui.menu=None;cx.notify();})))
+                .child(tab("Preview", self.ui.preview_open, cx.listener(|this,_,_,cx|{this.ui.preview_open=true;this.ui.menu=None;cx.notify();})))))
             .child(
                 div()
-                    .w(logical(352.))
+                    .w(px(layout.sidebar_width))
                     .flex_shrink_0()
                     .h_full()
                     .flex()
                     .flex_col()
                     .bg(rgb(CARD))
+                    .when(compact, |d|d.w_full().h_auto().flex_1().min_h_0())
+                    .when(compact && self.ui.preview_open, |d|d.hidden())
                     .border_r_1()
                     .border_color(rgb(BORDER))
                     .child(
@@ -939,6 +975,9 @@ impl Render for TuxScale {
                                     )),
                             ),
                     )
+                    .when(compact, |d|d.child(div().flex().justify_center().flex_shrink_0().py_2()
+                        .child(tab("Videos", !image, cx.listener(|this,_,_,cx|this.set_mode(Mode::Video,cx))))
+                        .child(tab("Images", image, cx.listener(|this,_,_,cx|this.set_mode(Mode::Image,cx))))))
                     .child(
                         div()
                             .id("sidebar-scroll")
@@ -960,7 +999,9 @@ impl Render for TuxScale {
                     .flex_col()
                     .items_center()
                     .justify_center()
+                    .when(compact, |d|d.h_auto().min_h_0().w_full())
                     .overflow_hidden()
+                    .when(compact && !self.ui.preview_open, |d|d.hidden())
                     .on_click(cx.listener(|this, e, w, cx| {
                         if let ClickEvent::Mouse(mouse) = e {
                             if mouse.up.click_count == 2 && !this.running {
@@ -992,6 +1033,7 @@ impl Render for TuxScale {
                             }
                             this.batch = p.is_dir();
                             this.input = Some(p.clone());
+                            this.ui.preview_open = true;
                             this.completed_output = None;
                             this.persist();
                             cx.notify();
@@ -1019,8 +1061,10 @@ impl Render for TuxScale {
                             )),
                     )
                     .child(if self.input.is_none() && !self.running {
-                        div()
-                            .max_w(logical(384.))
+                        div().id("idle-scroll").w_full().h_full().overflow_y_scroll().pt(logical(88.)).pb_4()
+                        .child(div().min_h_full().flex().flex_col().items_center().justify_center()
+                        .child(div()
+                            .w_full().max_w(logical(384.))
                             .px_5()
                             .flex()
                             .flex_col()
@@ -1136,26 +1180,28 @@ impl Render for TuxScale {
                             )
                             .child(div().mt_6().child(caption(
                                 "Double-click to select   ·   Drag & drop supported",
-                            )))
+                            )))))
                             .into_any_element()
                     } else {
                         let output = self.completed_output.clone();
                         let input = self.input.clone();
                         div()
+                            .id("workspace-scroll")
                             .w_full()
-                            .h_full()
+                            .h_full().min_h_0().overflow_y_scroll()
                             .pt(logical(88.))
-                            .px_8()
-                            .pb_8()
+                            .px(px(layout.padding))
+                            .pb(px(layout.padding))
                             .flex()
                             .flex_col()
                             .gap_4()
+                            .when(layout.short, |d|d.gap_2())
                             .child(caption(
                                 self.input
                                     .as_ref()
                                     .map(|p| p.display().to_string())
                                     .unwrap_or_default(),
-                            ))
+                            ).w_full().text_ellipsis().flex_shrink_0())
                             .child(if image && !self.batch {
                                 self.image_preview(cx)
                             } else {
@@ -1176,10 +1222,10 @@ impl Render for TuxScale {
                                     ))
                                     .into_any_element()
                             })
-                            .child(caption(self.stage.clone()))
+                            .child(caption(self.stage.clone()).flex_shrink_0())
                             .child(
                                 div()
-                                    .h(logical(6.))
+                                    .h(logical(6.)).flex_shrink_0()
                                     .w_full()
                                     .rounded_full()
                                     .bg(rgb(SECONDARY))
@@ -1207,7 +1253,7 @@ impl Render for TuxScale {
                                 d.child(
                                     div()
                                         .id("process-logs")
-                                        .h(logical(160.))
+                                        .h(px(layout.log_height)).flex_shrink_0().min_w_0()
                                         .overflow_y_scroll()
                                         .bg(rgb(CARD))
                                         .p_3()

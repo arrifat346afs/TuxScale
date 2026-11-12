@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=TuxScale
-Comment=AI-powered image and video upscaling for Linux
-Exec=tuxscale
-Icon=io.github.arrifat346afs.TuxScale
-Type=Application
-Categories=AudioVideo;Graphics;
-StartupNotify=true

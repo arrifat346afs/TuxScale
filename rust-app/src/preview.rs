@@ -106,7 +106,7 @@ impl TuxScale {
             .id("image-preview")
             .relative()
             .flex_1()
-            .min_h_0()
+            .min_h(rems(10.))
             .w_full()
             .overflow_hidden();
         if let Some(output) = output {
@@ -157,11 +157,19 @@ impl TuxScale {
                         .object_fit(ObjectFit::Contain),
                 )
                 .child(Reveal {
+                    // Give the before image a real, inset-stretched containing block.
+                    // Resolving its intrinsic source dimensions independently made
+                    // portrait images render at their natural width beside the output.
                     image: div()
-                        .absolute()
+                        .relative()
                         .size_full()
                         .bg(rgb(0x0f1419))
-                        .child(img(input).size_full().object_fit(ObjectFit::Contain))
+                        .child(
+                            img(input)
+                                .absolute()
+                                .size_full()
+                                .object_fit(ObjectFit::Contain),
+                        )
                         .into_any_element(),
                     fraction,
                 })
@@ -274,6 +282,7 @@ mod tests {
                         app.mode = crate::Mode::Image;
                         app.batch = false;
                         app.input = Some(PathBuf::from(input));
+                        app.ui.preview_open = true;
                         app.completed_output = output.map(PathBuf::from);
                         app
                     })

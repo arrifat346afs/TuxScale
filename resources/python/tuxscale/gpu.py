@@ -255,6 +255,10 @@ def load_model(
             print(msg, file=sys.stderr, flush=True)
 
     torch.backends.cudnn.benchmark = True
+    if hasattr(torch.backends.cuda.matmul, 'allow_tf32'):
+        torch.backends.cuda.matmul.allow_tf32 = True
+    if hasattr(torch.backends.cudnn, 'allow_tf32'):
+        torch.backends.cudnn.allow_tf32 = True
 
     try:
         from spandrel import ModelLoader
@@ -267,18 +271,29 @@ def load_model(
     descriptor = descriptor.eval()
 
     supports_half = getattr(descriptor, 'supports_half', False)
-    use_half = False
+    supports_bf16 = getattr(descriptor, 'supports_bfloat16', False)
+    cuda_bf16 = (
+        device.type == 'cuda'
+        and hasattr(torch.cuda, 'is_bf16_supported')
+        and torch.cuda.is_bf16_supported()
+    )
+
+    chosen_dtype = torch.float32
     if half:
         if supports_half:
             descriptor = descriptor.half()
-            use_half = True
+            chosen_dtype = torch.float16
+        elif supports_bf16 and cuda_bf16:
+            descriptor = descriptor.bfloat16()
+            chosen_dtype = torch.bfloat16
+            _log(f"Model '{model_name}' accelerated with bfloat16 Tensor Cores.")
         else:
             descriptor = descriptor.float()
-            use_half = False
-            _log(f"Model '{model_name}' does not support FP16 half-precision; falling back to FP32.")
+            chosen_dtype = torch.float32
+            _log(f"Model '{model_name}' does not support FP16/BF16; falling back to FP32.")
     else:
         descriptor = descriptor.float()
-        use_half = False
+        chosen_dtype = torch.float32
 
     descriptor = descriptor.to(device=device)
 
@@ -288,7 +303,7 @@ def load_model(
         except Exception:
             pass
 
-    return descriptor, scale, use_half
+    return descriptor, scale, chosen_dtype
 
 
 def forward_tiled_gpu(
@@ -296,7 +311,8 @@ def forward_tiled_gpu(
     x: torch.Tensor,
     tile_size: int = 512,
     tile_pad: int = 10,
-    net_scale: int = 4
+    net_scale: int = 4,
+    tile_callback: Optional[Callable[[int, int], None]] = None
 ) -> torch.Tensor:
     """
     Tiled model execution entirely on GPU tensor without host transfers.
@@ -305,10 +321,13 @@ def forward_tiled_gpu(
     b, c, h, w = x.shape
     tiles_x = math.ceil(w / tile_size)
     tiles_y = math.ceil(h / tile_size)
+    total_tiles = tiles_x * tiles_y
     out = torch.empty((b, c, h * net_scale, w * net_scale), dtype=x.dtype, device=x.device)
 
+    tile_idx = 0
     for i in range(tiles_y):
         for j in range(tiles_x):
+            tile_idx += 1
             ofs_x = j * tile_size
             ofs_y = i * tile_size
             input_start_x = max(0, ofs_x - tile_pad)
@@ -329,6 +348,12 @@ def forward_tiled_gpu(
                 tile_out[:, :, pad_top : pad_top + valid_h, pad_left : pad_left + valid_w]
             )
 
+            if tile_callback is not None:
+                try:
+                    tile_callback(tile_idx, total_tiles)
+                except Exception:
+                    pass
+
     return out
 
 
@@ -345,7 +370,7 @@ class GpuUpscaler:
         target_scale: int = 4,
         net_scale: int = 4,
         tile_size: int = 0,
-        half: bool = True,
+        half: Any = True,
         channels_last: bool = True,
         log_fn: Optional[Callable[[str], None]] = None
     ):
@@ -354,8 +379,11 @@ class GpuUpscaler:
         self.target_scale = target_scale
         self.net_scale = net_scale
         self.tile_size = tile_size
-        self.half = half
-        self.dtype = torch.float16 if half else torch.float32
+        self.half = bool(half) if isinstance(half, bool) else (half != torch.float32)
+        if isinstance(half, torch.dtype):
+            self.dtype = half
+        else:
+            self.dtype = torch.float16 if half else torch.float32
         self.channels_last = channels_last
         self.log_fn = log_fn or (lambda msg: print(msg, file=sys.stderr, flush=True))
         self.oom_occurred = False
@@ -364,7 +392,8 @@ class GpuUpscaler:
         self,
         frame_uint8_cpu: np.ndarray,
         copy_stream: Optional[torch.cuda.Stream] = None,
-        compute_stream: Optional[torch.cuda.Stream] = None
+        compute_stream: Optional[torch.cuda.Stream] = None,
+        tile_callback: Optional[Callable[[int, int], None]] = None
     ) -> Tuple[np.ndarray, float, float, float, float]:
         """
         Takes raw HxWx3 uint8 BGR numpy array from host.
@@ -415,7 +444,13 @@ class GpuUpscaler:
                 try:
                     if self.tile_size > 0 or self.oom_occurred:
                         active_tile = self.tile_size if self.tile_size > 0 else 512
-                        out = forward_tiled_gpu(self.model, x, tile_size=active_tile, net_scale=self.net_scale)
+                        out = forward_tiled_gpu(
+                            self.model,
+                            x,
+                            tile_size=active_tile,
+                            net_scale=self.net_scale,
+                            tile_callback=tile_callback
+                        )
                     else:
                         out = self.model(x)
                 except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
@@ -423,7 +458,13 @@ class GpuUpscaler:
                         self.log_fn(f"[GPU] CUDA OutOfMemoryError detected! Retrying frame with tiling (tile=512)...")
                         torch.cuda.empty_cache()
                         self.oom_occurred = True
-                        out = forward_tiled_gpu(self.model, x, tile_size=512, net_scale=self.net_scale)
+                        out = forward_tiled_gpu(
+                            self.model,
+                            x,
+                            tile_size=512,
+                            net_scale=self.net_scale,
+                            tile_callback=tile_callback
+                        )
                     else:
                         raise
                 ev_model_end.record(c_stream)

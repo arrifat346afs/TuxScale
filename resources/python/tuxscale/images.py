@@ -10,7 +10,8 @@ import math
 import os
 import signal
 import sys
-from typing import List, Optional, Tuple
+import threading
+from typing import List, Optional, Tuple, Callable
 
 import cv2
 import numpy as np
@@ -32,6 +33,58 @@ def log(msg: str) -> None:
 
 def progress(current: int, total: int) -> None:
     print(f"PROGRESS {current} {total}", flush=True)
+
+
+def report_pct(pct: float, message: str) -> None:
+    clamped = max(0.0, min(100.0, float(pct)))
+    print(f"PROGRESS_PCT {clamped:.1f} {message}", flush=True)
+
+
+class InferenceProgressTracker:
+    """
+    Lightweight background progress emitter for non-tiled single image inference
+    so the UI progress bar moves smoothly during GPU compute.
+    """
+
+    def __init__(
+        self,
+        start_pct: float,
+        max_pct: float,
+        message: str,
+        on_progress: Callable[[float, str], None],
+        interval: float = 0.35
+    ):
+        self.start_pct = start_pct
+        self.max_pct = max_pct
+        self.message = message
+        self.on_progress = on_progress
+        self.interval = interval
+        self.stop_event = threading.Event()
+        self.thread = None
+
+    def __enter__(self):
+        self.stop_event.clear()
+
+        def _run():
+            current = self.start_pct
+            step = max(0.8, (self.max_pct - self.start_pct) * 0.12)
+            while not self.stop_event.wait(self.interval):
+                if current < self.max_pct:
+                    current = min(self.max_pct, current + step)
+                    step = max(0.2, step * 0.94)
+                    try:
+                        self.on_progress(current, self.message)
+                    except Exception:
+                        pass
+
+        self.thread = threading.Thread(target=_run, daemon=True)
+        self.thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop_event.set()
+        if self.thread:
+            self.thread.join(timeout=0.5)
 
 
 MAX_DIMENSION = 16384
@@ -170,6 +223,48 @@ def save_upscaled_image(
         raise
 
 
+def determine_tile_size(
+    in_w: int,
+    in_h: int,
+    target_scale: int,
+    low_vram: bool = False,
+    user_tile: int = 0,
+    device: Optional[torch.device] = None,
+    dtype: torch.dtype = torch.float16
+) -> int:
+    """
+    Intelligently determines whether tiling is needed based on available GPU VRAM.
+    Avoids unnecessary tiling on high-VRAM cards (e.g. 12GB RTX 3060) which slows down processing.
+    """
+    if user_tile > 0:
+        return user_tile
+
+    if low_vram:
+        return 512
+
+    if not device or device.type != 'cuda':
+        return 512
+
+    try:
+        free_mem, _ = torch.cuda.mem_get_info(device)
+        bytes_per_pixel = 180 if dtype == torch.float32 else 90
+        pixels = in_w * in_h
+        output_bytes = pixels * (target_scale ** 2) * 4
+        estimated_peak = int(pixels * bytes_per_pixel + output_bytes + (300 * 1024 * 1024))
+
+        if estimated_peak < free_mem * 0.75:
+            return 0
+
+        if free_mem >= 6 * 1024 * 1024 * 1024:
+            return 1536
+        elif free_mem >= 3 * 1024 * 1024 * 1024:
+            return 1024
+        else:
+            return 512
+    except Exception:
+        return 512 if low_vram else 0
+
+
 def upscale_single_image_pytorch(
     gpu_upscaler: GpuUpscaler,
     image_path: str,
@@ -178,11 +273,15 @@ def upscale_single_image_pytorch(
     output_format: str,
     quality: int,
     low_vram: bool = False,
-    device: Optional[torch.device] = None
+    device: Optional[torch.device] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None
 ) -> str:
     """
     Upscales one image using the provided GpuUpscaler and saves it to output_path.
     """
+    if progress_callback:
+        progress_callback(0.05, f"Reading {os.path.basename(image_path)}...")
+
     bgr, alpha = load_and_orient_image(image_path)
     h, w = bgr.shape[:2]
     out_h = int(round(h * target_scale))
@@ -194,25 +293,51 @@ def upscale_single_image_pytorch(
             f"Output dimension ({out_w}x{out_h}) exceeds maximum supported size of {MAX_DIMENSION}px per side."
         )
 
-    # Estimate output size and GPU memory pressure
-    estimated_bytes = out_w * out_h * 4
-    if device and device.type == 'cuda':
-        try:
-            free_mem, _ = torch.cuda.mem_get_info(device)
-            if not low_vram and (estimated_bytes * 6 > free_mem or max(w, h) >= 1200):
-                log(f"[PyTorch] Large image ({w}x{h} -> {out_w}x{out_h}, ~{estimated_bytes // (1024*1024)}MB). Auto-enabling tiling to protect VRAM.")
-                gpu_upscaler.tile_size = 512
-        except Exception:
-            pass
+    # Calculate optimal tile size based on available VRAM
+    optimal_tile = determine_tile_size(
+        in_w=w,
+        in_h=h,
+        target_scale=target_scale,
+        low_vram=low_vram,
+        user_tile=gpu_upscaler.tile_size,
+        device=device,
+        dtype=gpu_upscaler.dtype
+    )
+    gpu_upscaler.tile_size = optimal_tile
+    if optimal_tile > 0:
+        log(f"[PyTorch] Memory-efficient tiling active (tile size: {optimal_tile}px)")
+    else:
+        log(f"[PyTorch] Processing full image ({w}x{h} -> {out_w}x{out_h}) directly on GPU in {gpu_upscaler.dtype}")
+
+    if progress_callback:
+        progress_callback(0.18, "Preparing GPU tensors...")
+
+    def on_tile(tile_idx: int, total_tiles: int):
+        if progress_callback:
+            tile_frac = tile_idx / max(1, total_tiles)
+            pct = 0.20 + 0.65 * tile_frac
+            progress_callback(pct, f"Upscaling tile {tile_idx}/{total_tiles} ({int(tile_frac * 100)}%)...")
 
     # Upscale RGB using Real-ESRGAN
-    upscaled_bgr, _, _, _, _ = gpu_upscaler.upscale_frame_direct(bgr)
+    is_tiled = gpu_upscaler.tile_size > 0
+    if not is_tiled and progress_callback:
+        progress_callback(0.20, f"Running AI inference on GPU...")
+        with InferenceProgressTracker(0.22, 0.82, "Upscaling image on GPU...", on_progress=progress_callback):
+            upscaled_bgr, _, _, _, _ = gpu_upscaler.upscale_frame_direct(bgr, tile_callback=on_tile)
+    else:
+        upscaled_bgr, _, _, _, _ = gpu_upscaler.upscale_frame_direct(bgr, tile_callback=on_tile)
+
+    if progress_callback:
+        progress_callback(0.88, "Post-processing image...")
 
     # If alpha channel was present, upscale it with bicubic resize and recombine
     upscaled_alpha = None
     if alpha is not None:
         upscaled_alpha = cv2.resize(alpha, (out_w, out_h), interpolation=cv2.INTER_CUBIC)
         upscaled_alpha = np.clip(upscaled_alpha, 0, 255).astype(np.uint8)
+
+    if progress_callback:
+        progress_callback(0.92, f"Saving {os.path.basename(output_path)}...")
 
     save_upscaled_image(
         bgr=upscaled_bgr,
@@ -221,6 +346,9 @@ def upscale_single_image_pytorch(
         output_format=output_format,
         quality=quality
     )
+
+    if progress_callback:
+        progress_callback(1.0, f"Saved {os.path.basename(output_path)}")
 
     return output_path
 
@@ -270,6 +398,7 @@ def run_image_upscaling():
 
     device = torch.device('cuda:0')
     weights_dir = args.weights_dir or get_default_weights_dir()
+    report_pct(4.0, f"Checking model weights for '{args.model}'...")
     model_path = download_weights(args.model, weights_dir, log_fn=log)
 
     tile_size = args.tile
@@ -278,6 +407,7 @@ def run_image_upscaling():
 
     half = not args.fp32
     log(f"[PyTorch] Loading model '{args.model}' (scale={args.scale}x, tile={tile_size}, half={half})...")
+    report_pct(8.0, f"Loading model '{args.model}' into GPU...")
 
     try:
         model, net_scale, half = load_model(
@@ -305,6 +435,7 @@ def run_image_upscaling():
 
     total_images = len(input_paths)
     log(f"[PyTorch] Processing {total_images} image(s)...")
+    report_pct(14.0, f"Model loaded to GPU. Starting image processing...")
 
     progress(0, total_images)
 
@@ -335,6 +466,13 @@ def run_image_upscaling():
                 fmt_ext = 'jpg'
             out_path = f"{base}_upscaled.{fmt_ext}"
 
+        img_base = (idx / total_images) * 100.0
+        img_span = 100.0 / total_images
+
+        def image_progress(local_pct: float, local_msg: str):
+            global_pct = img_base + img_span * local_pct
+            report_pct(global_pct, local_msg)
+
         try:
             log(f"[PyTorch] [{idx + 1}/{total_images}] Upscaling: {os.path.basename(in_path)}")
             upscale_single_image_pytorch(
@@ -345,7 +483,8 @@ def run_image_upscaling():
                 output_format=args.format,
                 quality=args.quality,
                 low_vram=args.low_vram,
-                device=device
+                device=device,
+                progress_callback=image_progress
             )
             success_count += 1
             log(f"[PyTorch] [{idx + 1}/{total_images}] Complete -> {out_path}")
@@ -355,6 +494,8 @@ def run_image_upscaling():
 
         # Print progress after each image
         progress(idx + 1, total_images)
+
+    report_pct(100.0, "Image upscaling complete!")
 
     if failure_count > 0:
         log(f"[PyTorch] Finished with {failure_count} failure(s) out of {total_images} images.")

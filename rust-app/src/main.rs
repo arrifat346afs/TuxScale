@@ -1,5 +1,6 @@
 mod assets;
 mod engine;
+mod layout;
 mod preferences;
 mod preview;
 mod ui;
@@ -163,6 +164,7 @@ impl TuxScale {
             if let Ok(Ok(Some(paths))) = receiver.await {
                 view.update(cx, |this, cx| {
                     this.input = paths.into_iter().next();
+                    this.ui.preview_open = true;
                     this.completed_output = None;
                     this.stage = "Input selected".into();
                     cx.notify();
@@ -276,6 +278,7 @@ impl TuxScale {
         let cancel = Arc::new(AtomicBool::new(false));
         self.cancellation = Some(cancel.clone());
         self.running = true;
+        self.ui.preview_open = true;
         self.progress = 0.0;
         self.stage = if installer {
             "Starting PyTorch installer"
@@ -349,7 +352,7 @@ fn main() {
             let bounds = Bounds::centered(None, size(px(900.), px(670.)), cx);
             cx.open_window(
                 WindowOptions {
-                    window_min_size: Some(size(px(780.), px(560.))),
+                    window_min_size: Some(size(px(480.), px(360.))),
                     titlebar: Some(gpui::TitlebarOptions {
                         title: Some("TuxScale".into()),
                         ..Default::default()
