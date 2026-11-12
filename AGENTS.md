@@ -1,12 +1,20 @@
-# TuxScale Project Instructions & Rules
+# TuxScale Project Instructions
 
-## Package Manager
+TuxScale is a native Rust + GPUI application in `rust-app/`.
 
-- **Always use Bun** (`bun`) for installing dependencies, running scripts, and development:
-  - Install: `bun install`
-  - Dev server: `bun run dev` (or `bun dev`)
-  - Build: `bun run build`
-  - Typecheck: `bun run typecheck`
-  - Lint: `bun run lint`
-- **Do not delete `package-lock.json`**; maintain dual compatibility with `npm` while always executing operations via `bun`.
-- Always preserve `"trustedDependencies": ["electron", "esbuild"]` and `"overrides": { "strip-ansi": "^6.0.1" }` in `package.json` so Electron lifecycle binaries and CommonJS packages function without issues under Bun.
+## Development
+
+- Run: `cargo run --manifest-path rust-app/Cargo.toml`
+- Check: `cargo check --locked --manifest-path rust-app/Cargo.toml`
+- Test: `cargo test --locked --manifest-path rust-app/Cargo.toml`
+- Format: `cargo fmt --manifest-path rust-app/Cargo.toml`
+- Package Linux: `bash rust-app/scripts/package-linux.sh`
+- Keep `rust-app/Cargo.lock` committed for reproducible application builds.
+- Do not reintroduce Electron, Node, Bun, or a JavaScript frontend/build pipeline.
+
+## Runtime resources
+
+- Keep `resources/models`, `resources/linux/bin`, and `resources/python`: the native app uses these for inference.
+- The PyTorch backend runs the existing Python workers. Reuse an installed environment before installing another one.
+- Do not commit Python environments, Cargo targets, package outputs, or local caches.
+- Preserve licenses for bundled assets and vendored Rust dependencies.

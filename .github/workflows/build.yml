@@ -1,147 +1,61 @@
-name: Build and Release
+name: Build Native Linux
 
 on:
   workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main, codex/rust-gpui-migration]
+
+permissions:
+  contents: read
 
 jobs:
   build-linux:
-    name: Build Linux Packages
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           lfs: true
 
-      - name: Verify Git LFS model weights
-        run: |
-          for f in resources/models/*.pth; do
-            [ -e "$f" ] || continue
-            size=$(stat -c%s "$f")
-            if [ "$size" -lt 1048576 ]; then
-              echo "::error file=$f::Model weights file $f is smaller than 1 MB ($size bytes), likely an unfetched Git LFS pointer stub."
-              exit 1
-            fi
-            if head -n 1 "$f" | grep -q "^version https://git-lfs"; then
-              echo "::error file=$f::Model weights file $f starts with 'version https://git-lfs' (unfetched Git LFS pointer stub)."
-              exit 1
-            fi
-          done
-          echo "All model weights in resources/models/ verified successfully."
-
-      - name: Maximize build disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          df -h
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install system dependencies
+      - name: Install native build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm libarchive-tools zstd jq unzip
+          sudo apt-get install -y build-essential clang cmake pkg-config nasm \
+            libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libxcb1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libxcb-xinput-dev libxcb-xkb-dev libxcb-render0-dev libxcb-shm0-dev \
+            libwayland-dev libvulkan-dev libssl-dev libasound2-dev libudev-dev \
+            libdbus-1-dev libegl1-mesa-dev libgit2-dev zlib1g-dev ffmpeg
 
-      - name: Download latest backend binary (upscayl-bin)
-        run: bash scripts/download-linux-binaries.sh
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Build Linux packages
-        run: bun run build:linux
-
-      - name: Extract version from package.json
-        id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: tuxscale-linux
-          path: |
-            dist/*.AppImage
-            dist/*.deb
-            dist/*.rpm
-            dist/*.pacman
-            dist/*.yml
-            dist/*.yaml
-          if-no-files-found: error
-
-  release:
-    name: Publish GitHub Release
-    needs: build-linux
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download Linux packages
-        uses: actions/download-artifact@v4
-        with:
-          name: tuxscale-linux
-          path: release-assets
-
-      - name: Prepare and check release asset sizes (split if >= 2GB)
+      - name: Set up Rust
         run: |
-          set -euo pipefail
-          echo "==> Inspecting release assets before release upload..."
-          ls -lh release-assets
+          rustup toolchain install stable --profile minimal --component rustfmt
+          rustup default stable
 
-          # GitHub Release Asset limit is strictly 2 GiB (2,147,483,648 bytes)
-          # Use 2000 MB (2,097,152,000 bytes) threshold to ensure a safe margin
-          MAX_BYTES=2097152000
-          SPLIT_OCCURRED=0
+      - name: Verify model assets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for model in Path('resources/models').iterdir():
+              if model.suffix in ('.pth', '.bin'):
+                  with model.open('rb') as stream:
+                      assert not stream.read(128).startswith(b'version https://git-lfs'), f'Unfetched LFS model: {model}'
+          PY
 
-          for f in release-assets/*; do
-            [ -f "$f" ] || continue
-            size=$(stat -c%s "$f")
-            base=$(basename "$f")
+      - name: Check formatting
+        run: cargo fmt --manifest-path rust-app/Cargo.toml -- --check
 
-            if [ "$size" -gt "$MAX_BYTES" ]; then
-              echo "⚠️  Asset $base ($size bytes) exceeds GitHub 2 GiB limit. Splitting into 1900MB chunks..."
-              split -b 1900M --numeric-suffixes=1 "$f" "${f}.part"
-              rm -f "$f"
-              SPLIT_OCCURRED=1
-              echo "✓ Split $base into chunks:"
-              ls -lh "${f}.part"*
-            else
-              echo "✓ Asset $base ($size bytes) is well within GitHub 2 GiB limit."
-            fi
-          done
+      - name: Test native application
+        run: cargo test --locked --manifest-path rust-app/Cargo.toml
 
-          if [ "$SPLIT_OCCURRED" -eq 1 ]; then
-            printf "%s\n" \
-              "To rejoin any multi-part release asset (e.g. .part01, .part02):" \
-              "" \
-              "Linux / macOS:" \
-              "  cat <filename>.part* > <filename>" \
-              "  chmod +x <filename>   # if AppImage" \
-              "" \
-              "Windows (Command Prompt):" \
-              "  copy /b <filename>.part01 + <filename>.part02 <filename>" \
-              > release-assets/HOW_TO_JOIN_SPLIT_ASSETS.txt
-          fi
+      - name: Build Linux AppDir
+        run: bash rust-app/scripts/package-linux.sh
 
-          echo "==> Final list of release assets to upload:"
-          ls -lh release-assets
+      - name: Archive native package
+        run: tar -C rust-app/dist -czf rust-app/dist/TuxScale-linux-x86_64.tar.gz TuxScale.AppDir
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          tag_name: v${{ needs.build-linux.outputs.version }}
-          name: TuxScale v${{ needs.build-linux.outputs.version }}
-          files: release-assets/*
-          generate_release_notes: true
+          name: tuxscale-native-linux
+          path: rust-app/dist/TuxScale-linux-x86_64.tar.gz
+          if-no-files-found: error

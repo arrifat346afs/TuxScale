@@ -1,0 +1,15 @@
+[package]
+name = "tuxscale"
+version = "1.2.2"
+edition = "2024"
+description = "AI image and video upscaling for Linux"
+license = "AGPL-3.0-only"
+
+[dependencies]
+gpui = "0.2.2"
+async-channel = "2.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[patch.crates-io]
+xattr = { path = "vendor/xattr" }

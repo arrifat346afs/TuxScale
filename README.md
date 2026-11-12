@@ -1,172 +1,74 @@
 <div align="center">
-  <img src="Untitled.png" alt="TuxScale Logo" width="120" />
-</div>
-<h1 align="center">🐧 TuxScale</h1>
-
-<p align="center">
-  <strong>AI-powered video and image upscaling for Linux</strong>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/electron-42.5-blue?logo=electron" alt="Electron" />
-  <img src="https://img.shields.io/badge/react-19.2-61DAFB?logo=react" alt="React" />
-  <img src="https://img.shields.io/badge/typescript-6.0-3178C6?logo=typescript" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/vite-7.2-646CFF?logo=vite" alt="Vite" />
-  <img src="https://img.shields.io/badge/tailwindcss-4.3-06B6D4?logo=tailwindcss" alt="Tailwind CSS" />
-  <img src="https://img.shields.io/badge/bun-1.2-FBF0DF?logo=bun" alt="Bun" />
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
-</p>
-<div align="center">
-  <img src="/screenshots/screenshot_20260710_102004-region.png" alt="TuxScale Screenshot" width="900" />
+  <img src="resources/icon.png" alt="TuxScale Logo" width="120" />
+  <h1>TuxScale</h1>
+  <p>Native Rust + GPUI image and video upscaling for Linux</p>
 </div>
 
----
+TuxScale uses GPUI for its desktop interface and Rust for job orchestration. NCNN/Vulkan and the existing Python/PyTorch CUDA workers perform inference. The application does not require Electron, Node.js, or JavaScript dependencies.
 
-## Table of Contents
+## Run
 
-- [Features](#features)
-- [How it Works](#how-it-works)
-- [Supported Formats](#supported-formats)
-- [Prerequisites](#prerequisites)
-- [Project Setup](#project-setup)
-- [CI Builds](#ci-builds)
-- [Tech Stack](#tech-stack)
-- [Credits](#credits)
+Install a Rust toolchain and your distribution's GPUI build dependencies (C/C++ build tools, pkg-config, fontconfig, Vulkan, and X11/Wayland development libraries). The CI workflow lists the Ubuntu packages used for native builds.
 
----
-
-## Features
-
-- **Dual AI Inference Engines**:
-  - **ncnn / Vulkan** — Hardware-accelerated inference via [upscayl-ncnn](https://github.com/upscayl/upscayl-ncnn). Compatible with all modern GPUs (AMD, Intel, NVIDIA).
-  - **PyTorch / CUDA** — Dedicated Python worker for NVIDIA GPUs with automatic VRAM management, half-precision (FP16), and seamless OOM-to-tile fallback.
-- **Video & Image Modes** — Seamless toggle between Video and Image upscaling from the top navigation bar.
-- **Single & Batch Upscaling** — Upscale single files or batch-process entire directories with real-time per-file progress tracking.
-- **Interactive Before / After Comparison** — Inspect image upscaling results side-by-side using an interactive comparison slider.
-- **Alpha Channel & Transparency Support** — Automatically preserves image transparency by isolating, bicubic-resizing, and recombining alpha channels.
-- **Live Process Logs (`Ctrl+L`)** — Toggle real-time process stdout/stderr logs on the fly by pressing `Ctrl+L` or clicking the log button during upscaling.
-- **Safe Output Handling** — Non-destructive exports that never overwrite source files, creating `<name>_upscaled.<ext>` with automatic numeric suffixes on collisions.
-- **Linux Native Packaging** — AppImage, deb, rpm, and Arch Linux pacman packages.
-
----
-
-## How it Works
-
-### Video Upscaling Flow
-
-```
-Input Video (FFmpeg) ──► Extract Frames ──► Upscale Frames (ncnn / PyTorch) ──► Reassemble Video (FFmpeg) ──► Output Video
-```
-
-1. **Extract**: FFmpeg extracts frames from the input video at the original frame rate. Audio streams are extracted in parallel.
-2. **Upscale**: Frames are processed in batches using either the Vulkan `upscayl-bin` runner or the PyTorch CUDA worker.
-3. **Reassemble**: Upscaled frames are re-encoded with FFmpeg and remuxed with the original audio track.
-
-### Image Upscaling Flow
-
-```
-Input Image ──► Read & EXIF Orientation ──► AI Super-Resolution (ncnn / PyTorch) ──► Alpha Blending & Encoding ──► Output Image
-```
-
-1. **Decode**: Reads the image (PNG, JPG, WebP, BMP, TIFF) with OpenCV/PIL and applies EXIF orientation.
-2. **Upscale**: Uses the selected Real-ESRGAN model at 2x, 3x, or 4x scale.
-3. **Save**: Encodes to the desired format (PNG, JPG, or WebP) with user-configurable quality settings.
-
----
-
-## Supported Formats
-
-| Category   | Input Formats                               | Export Formats                                  |
-| ---------- | ------------------------------------------- | ----------------------------------------------- |
-| **Images** | PNG, JPG, JPEG, WEBP, BMP, TIFF             | PNG (lossless), JPG, WEBP (with quality slider) |
-| **Videos** | MP4, WebM, MKV, AVI, MOV, FLV, WMV, TS, M4V | MP4, MKV, WebM, MOV, AVI                        |
-
----
-
-## Prerequisites
-
-- **Git & Git LFS** — Git LFS is required when cloning the repository to pull the model weights in `resources/models/`.
-- **FFmpeg & ffprobe** — Required for video frame extraction and reassembly.
-- **Vulkan Driver** — Required for the ncnn/Vulkan engine (compatible with AMD, Intel, and NVIDIA GPUs).
-- **NVIDIA GPU & CUDA (Optional)** — Required only if using the PyTorch CUDA engine backend.
-
----
-
-## Project Setup
-
-### Clone Repository (Requires Git LFS)
-
-```bash
+```sh
 git lfs install
 git clone https://github.com/arrifat346afs/TuxScale.git
 cd TuxScale
+git lfs pull
+cargo run --manifest-path rust-app/Cargo.toml
 ```
 
-### Install Dependencies
+FFmpeg and FFprobe must be on `PATH` for video processing. NCNN needs a working Vulkan driver. PyTorch requires an NVIDIA CUDA environment.
 
-```bash
-bun install
+## Features
+
+- Image/video modes, single-file and folder processing.
+- Native file selection, drag and drop, and saved preferences.
+- Model, scale, output format, quality, tile, and backend controls.
+- Adjustable interface scale (80% by default).
+- Full-area image preview and an interactive before/after reveal slider.
+- Progress, cancellation, process logs (`Ctrl+L`), and opening completed outputs.
+- NCNN/Vulkan inference and Python/PyTorch CUDA inference.
+
+The native migration still has gaps: in-app video playback, automatic application updates, and deb/rpm/pacman/Flatpak packaging are not implemented. See [native application details](rust-app/README.md).
+
+## Python and PyTorch
+
+Python is needed only for the PyTorch backend. The Rust app launches the image or video worker under `resources/python/` and reads its progress and logs.
+
+Existing environments are reused. Selection checks the executable chosen in Settings, `TUXSCALE_PYTHON_PATH`, bundled `resources/python-env`, the TuxScale configuration environment, and `~/.venvs/tuxscale`, before falling back to `python3` on `PATH`. Choose **PyTorch (CUDA)** in Settings and use **Refresh engine status** to inspect the resolved interpreter and CUDA availability.
+
+See [Python setup](resources/python/README.md) if an environment is not already available. Python environments are not stored in Git.
+
+## Check and build
+
+```sh
+cargo check --locked --manifest-path rust-app/Cargo.toml
+cargo test --locked --manifest-path rust-app/Cargo.toml
+cargo fmt --manifest-path rust-app/Cargo.toml -- --check
+cargo build --locked --release --manifest-path rust-app/Cargo.toml
 ```
 
-### Development
+The interactive native preview test is ignored by default because it needs a display and image fixtures.
 
-```bash
-bun run dev
+## Linux packaging
+
+```sh
+bash rust-app/scripts/package-linux.sh
 ```
 
-### Typecheck & Lint
+This creates `rust-app/dist/TuxScale.AppDir`. If `appimagetool` is installed, it also creates an AppImage. The AppDir contains the native executable, model files, NCNN binary, Python workers, desktop metadata, and licenses. An existing bundled Python environment is included when present; otherwise, an installed environment is used. FFmpeg and the required graphics/system libraries must be available on the destination system.
 
-```bash
-bun run typecheck
-bun run lint
-```
+GitHub Actions builds and tests the Rust application and uploads a Linux AppDir archive. It does not publish a release automatically.
 
-### Build (Linux packages)
+## Project structure
 
-```bash
-bun run build:linux
-```
-
-This generates distribution packages in `dist/`:
-
-- **AppImage** — Portable Linux executable
-- **.deb** — Debian / Ubuntu package
-- **.rpm** — Fedora / RHEL package
-- **.pkg.tar.zst** — Arch Linux pacman package
-
----
-
-## CI Builds
-
-The repository includes a GitHub Actions workflow (`.github/workflows/build.yml`) that can be triggered **manually** from the Actions tab in the GitHub UI:
-
-1. Go to your repository on GitHub.
-2. Click the **Actions** tab.
-3. Select **Build Linux** from the left sidebar.
-4. Click **Run workflow** → **Run workflow**.
-
-The workflow uses Bun to build the application and packages all four Linux formats (AppImage, deb, rpm, pacman) directly into GitHub Releases.
-
-> **Note on Git LFS & CI Bandwidth:**
-> Model weights in `resources/models/*.pth` (~147 MB total) are tracked with Git LFS, requiring `lfs: true` in CI checkout and downloading ~147 MB per CI run. An effective alternative to track in future releases is downloading weights on first run / lazy-loading at runtime, or attaching weights to a GitHub release and downloading them during packaging instead of tracking binary weights inside Git LFS.
-
----
-
-## Tech Stack
-
-| Category              | Technology                                                                                                |
-| --------------------- | --------------------------------------------------------------------------------------------------------- |
-| **Desktop Framework** | [Electron](https://www.electronjs.org/)                                                                   |
-| **Frontend**          | [React](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/)                             |
-| **Package Manager**   | [Bun](https://bun.sh/)                                                                                    |
-| **Build Tooling**     | [electron-vite](https://electron-vite.org/) / [Vite](https://vitejs.dev/)                                 |
-| **Packaging**         | [electron-builder](https://www.electron.build/)                                                           |
-| **Styling & UI**      | [Tailwind CSS v4](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)                         |
-| **Inference Engines** | [upscayl-ncnn](https://github.com/upscayl/upscayl-ncnn) (Vulkan) & [PyTorch](https://pytorch.org/) (CUDA) |
-| **Image Comparison**  | [react-compare-slider](https://github.com/nerdyman/react-compare-slider)                                  |
-
----
+- `rust-app/src/`: native UI, settings, preview, and processing orchestration.
+- `rust-app/assets/`: embedded logo and icons, with asset licenses.
+- `rust-app/vendor/`: documented compatibility patch for a GPUI dependency.
+- `resources/`: model weights, NCNN executable, and Python workers.
+- `scripts/`: optional backend download and Python environment setup helpers.
 
 ## Credits
 
-TuxScale is inspired by and builds upon the fantastic work of [Upscayl](https://github.com/upscayl/upscayl) — the #1 free and open-source AI image upscaler. Special thanks to the Upscayl team for their backend ([upscayl-ncnn](https://github.com/upscayl/upscayl-ncnn)) and inspiration.
+TuxScale builds on [GPUI](https://gpui.rs/), [Upscayl NCNN](https://github.com/upscayl/upscayl-ncnn), and [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN). Icons are from Lucide; their license is included with the embedded assets.

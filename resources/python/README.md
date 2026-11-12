@@ -46,12 +46,12 @@ python3 -c "import torch, spandrel, realesrgan; print('CUDA Available:', torch.c
 ### 5. Configure TuxScale
 
 1. Open TuxScale and navigate to the **Settings** tab.
-2. Under **Backend**, select **PyTorch (NVIDIA)** or **Auto**.
+2. Under **Backend**, select **PyTorch (CUDA)**.
 3. If you installed packages in a custom virtual environment (e.g., `~/.venvs/tuxscale-pytorch`), enter the path to that Python interpreter in **Custom Python Path**:
    ```
    /home/yourusername/.venvs/tuxscale-pytorch/bin/python3
    ```
-4. Verify that all status checks under **Engine Status** are green.
+4. Use **Refresh engine status** to verify the Python interpreter and CUDA availability.
 
 ## Model Weights
 
