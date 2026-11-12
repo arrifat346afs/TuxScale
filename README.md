@@ -15,7 +15,7 @@ git lfs install
 git clone https://github.com/arrifat346afs/TuxScale.git
 cd TuxScale
 git lfs pull
-cargo run --manifest-path rust-app/Cargo.toml
+cargo run --manifest-path app/Cargo.toml
 ```
 
 FFmpeg and FFprobe must be on `PATH` for video processing. NCNN needs a working Vulkan driver. PyTorch requires an NVIDIA CUDA environment.
@@ -30,7 +30,7 @@ FFmpeg and FFprobe must be on `PATH` for video processing. NCNN needs a working 
 - Progress, cancellation, process logs (`Ctrl+L`), and opening completed outputs.
 - NCNN/Vulkan inference and Python/PyTorch CUDA inference.
 
-The native migration still has gaps: in-app video playback, automatic application updates, and deb/rpm/pacman/Flatpak packaging are not implemented. See [native application details](rust-app/README.md).
+The native migration still has gaps: in-app video playback, automatic application updates, and deb/rpm/pacman/Flatpak packaging are not implemented. See [native application details](app/README.md).
 
 ## Python and PyTorch
 
@@ -43,10 +43,10 @@ See [Python setup](resources/python/README.md) if an environment is not already 
 ## Check and build
 
 ```sh
-cargo check --locked --manifest-path rust-app/Cargo.toml
-cargo test --locked --manifest-path rust-app/Cargo.toml
-cargo fmt --manifest-path rust-app/Cargo.toml -- --check
-cargo build --locked --release --manifest-path rust-app/Cargo.toml
+cargo check --locked --manifest-path app/Cargo.toml
+cargo test --locked --manifest-path app/Cargo.toml
+cargo fmt --manifest-path app/Cargo.toml -- --check
+cargo build --locked --release --manifest-path app/Cargo.toml
 ```
 
 The interactive native preview test is ignored by default because it needs a display and image fixtures.
@@ -54,18 +54,18 @@ The interactive native preview test is ignored by default because it needs a dis
 ## Linux packaging
 
 ```sh
-bash rust-app/scripts/package-linux.sh
+bash app/scripts/package-linux.sh
 ```
 
-This creates `rust-app/dist/TuxScale.AppDir`. If `appimagetool` is installed, it also creates an AppImage. The AppDir contains the native executable, model files, NCNN binary, Python workers, desktop metadata, and licenses. An existing bundled Python environment is included when present; otherwise, an installed environment is used. FFmpeg and the required graphics/system libraries must be available on the destination system.
+This creates `app/dist/TuxScale.AppDir`. If `appimagetool` is installed, it also creates an AppImage. The AppDir contains the native executable, model files, NCNN binary, Python workers, desktop metadata, and licenses. An existing bundled Python environment is included when present; otherwise, an installed environment is used. FFmpeg and the required graphics/system libraries must be available on the destination system.
 
 GitHub Actions builds and tests the Rust application and uploads a Linux AppDir archive. It does not publish a release automatically.
 
 ## Project structure
 
-- `rust-app/src/`: native UI, settings, preview, and processing orchestration.
-- `rust-app/assets/`: embedded logo and icons, with asset licenses.
-- `rust-app/vendor/`: documented compatibility patch for a GPUI dependency.
+- `app/src/`: native UI, settings, preview, and processing orchestration.
+- `app/assets/`: embedded logo and icons, with asset licenses.
+- `app/vendor/`: documented compatibility patch for a GPUI dependency.
 - `resources/`: model weights, NCNN executable, and Python workers.
 - `scripts/`: optional backend download and Python environment setup helpers.
 

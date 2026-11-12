@@ -5,14 +5,14 @@ This is the native desktop rewrite of TuxScale. It uses GPUI for the desktop UI 
 ## Run
 
 ```sh
-cd rust-app
+cd app
 cargo run
 ```
 
 Create a Linux AppDir and, when `appimagetool` is installed, an AppImage:
 
 ```sh
-bash rust-app/scripts/package-linux.sh
+bash app/scripts/package-linux.sh
 ```
 
 ## Implemented

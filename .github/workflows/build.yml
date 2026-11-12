@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
   push:
-    branches: [main, codex/rust-gpui-migration]
+    branches: [main]
 
 permissions:
   contents: read
@@ -43,19 +43,19 @@ jobs:
           PY
 
       - name: Check formatting
-        run: cargo fmt --manifest-path rust-app/Cargo.toml -- --check
+        run: cargo fmt --manifest-path app/Cargo.toml -- --check
 
       - name: Test native application
-        run: cargo test --locked --manifest-path rust-app/Cargo.toml
+        run: cargo test --locked --manifest-path app/Cargo.toml
 
       - name: Build Linux AppDir
-        run: bash rust-app/scripts/package-linux.sh
+        run: bash app/scripts/package-linux.sh
 
       - name: Archive native package
-        run: tar -C rust-app/dist -czf rust-app/dist/TuxScale-linux-x86_64.tar.gz TuxScale.AppDir
+        run: tar -C app/dist -czf app/dist/TuxScale-linux-x86_64.tar.gz TuxScale.AppDir
 
       - uses: actions/upload-artifact@v4
         with:
           name: tuxscale-native-linux
-          path: rust-app/dist/TuxScale-linux-x86_64.tar.gz
+          path: app/dist/TuxScale-linux-x86_64.tar.gz
           if-no-files-found: error

@@ -1,15 +1,15 @@
 # TuxScale Project Instructions
 
-TuxScale is a native Rust + GPUI application in `rust-app/`.
+TuxScale is a native Rust + GPUI application in `app/`.
 
 ## Development
 
-- Run: `cargo run --manifest-path rust-app/Cargo.toml`
-- Check: `cargo check --locked --manifest-path rust-app/Cargo.toml`
-- Test: `cargo test --locked --manifest-path rust-app/Cargo.toml`
-- Format: `cargo fmt --manifest-path rust-app/Cargo.toml`
-- Package Linux: `bash rust-app/scripts/package-linux.sh`
-- Keep `rust-app/Cargo.lock` committed for reproducible application builds.
+- Run: `cargo run --manifest-path app/Cargo.toml`
+- Check: `cargo check --locked --manifest-path app/Cargo.toml`
+- Test: `cargo test --locked --manifest-path app/Cargo.toml`
+- Format: `cargo fmt --manifest-path app/Cargo.toml`
+- Package Linux: `bash app/scripts/package-linux.sh`
+- Keep `app/Cargo.lock` committed for reproducible application builds.
 - Do not reintroduce Electron, Node, Bun, or a JavaScript frontend/build pipeline.
 
 ## Runtime resources
