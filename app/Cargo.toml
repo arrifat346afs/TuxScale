@@ -1,6 +1,6 @@
 [package]
 name = "tuxscale"
-version = "1.2.2"
+version = "2.0.0"
 edition = "2024"
 description = "AI image and video upscaling for Linux"
 license = "AGPL-3.0-only"
