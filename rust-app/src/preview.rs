@@ -148,8 +148,8 @@ impl TuxScale {
                     cx.stop_propagation();
                     cx.notify();
                 }))
-                // The output and input both occupy the entire viewport, including
-                // identical aspect-fit letterboxing. The input is clipped at the divider.
+                // Both layers share one viewport and preserve the source aspect ratio.
+                // The reveal divider clips the before layer without resizing it.
                 .child(
                     img(output)
                         .absolute()

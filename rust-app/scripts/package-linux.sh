@@ -23,12 +23,34 @@ if [ -x "$project_dir/resources/python-env/bin/python3" ]; then
 fi
 install -m644 "$project_dir/resources/icon.png" \
   "$appdir/usr/share/icons/hicolor/512x512/apps/io.github.arrifat346afs.TuxScale.png"
-install -m644 "$project_dir/io.github.arrifat346afs.TuxScale.desktop" "$appdir/usr/share/applications/"
-install -m644 "$project_dir/io.github.arrifat346afs.TuxScale.metainfo.xml" "$appdir/usr/share/metainfo/"
+cat > "$appdir/io.github.arrifat346afs.TuxScale.desktop" <<'DESKTOP'
+[Desktop Entry]
+Name=TuxScale
+Comment=AI-powered image and video upscaling for Linux
+Exec=tuxscale %U
+Icon=io.github.arrifat346afs.TuxScale
+Type=Application
+Categories=AudioVideo;Graphics;Video;
+StartupNotify=true
+DESKTOP
+install -m644 "$appdir/io.github.arrifat346afs.TuxScale.desktop" \
+  "$appdir/usr/share/applications/io.github.arrifat346afs.TuxScale.desktop"
+cat > "$appdir/usr/share/metainfo/io.github.arrifat346afs.TuxScale.metainfo.xml" <<'METAINFO'
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.arrifat346afs.TuxScale</id>
+  <name>TuxScale</name>
+  <summary>AI-powered image and video upscaling for Linux</summary>
+  <metadata_license>FSFAP</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <url type="homepage">https://github.com/arrifat346afs/TuxScale</url>
+  <provides><binary>tuxscale</binary></provides>
+  <categories><category>Graphics</category><category>Video</category></categories>
+</component>
+METAINFO
 install -m644 "$project_dir/LICENSE" "$appdir/usr/share/licenses/tuxscale/LICENSE"
 install -m644 "$project_dir/rust-app/assets/icons/LICENSE" "$appdir/usr/share/licenses/tuxscale/Lucide-LICENSE"
 # AppImage tooling discovers the desktop entry and icon at the AppDir root.
-install -m644 "$project_dir/io.github.arrifat346afs.TuxScale.desktop" "$appdir/"
 install -m644 "$project_dir/resources/icon.png" "$appdir/io.github.arrifat346afs.TuxScale.png"
 cat > "$appdir/AppRun" <<'APPRUN'
 #!/usr/bin/env sh

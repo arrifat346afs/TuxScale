@@ -53,6 +53,9 @@ fn icon(name: &'static str, size: f32) -> impl IntoElement {
 }
 fn caption(text: impl Into<SharedString>) -> Div {
     div()
+        .flex()
+        .flex_col()
+        .flex_shrink_0()
         .min_w_0()
         .overflow_hidden()
         .text_xs()
@@ -470,6 +473,9 @@ impl TuxScale {
             })
             .collect();
         div()
+            .w_full()
+            .min_w_0()
+            .flex_shrink_0()
             .flex()
             .flex_col()
             .gap_6()
@@ -623,6 +629,9 @@ impl TuxScale {
             ])
         };
         div()
+            .w_full()
+            .min_w_0()
+            .flex_shrink_0()
             .flex()
             .flex_col()
             .gap_5()
@@ -723,7 +732,7 @@ impl TuxScale {
                             div()
                                 .flex()
                                 .gap_2()
-                                .child(button(
+                                .child(div().flex_1().min_w_0().child(button(
                                     "−",
                                     false,
                                     self.running,
@@ -732,8 +741,8 @@ impl TuxScale {
                                         this.persist();
                                         cx.notify();
                                     }),
-                                ))
-                                .child(button(
+                                )))
+                                .child(div().flex_1().min_w_0().child(button(
                                     "+",
                                     false,
                                     self.running,
@@ -742,7 +751,7 @@ impl TuxScale {
                                         this.persist();
                                         cx.notify();
                                     }),
-                                )),
+                                ))),
                         ),
                 )
             })
@@ -981,6 +990,9 @@ impl Render for TuxScale {
                     .child(
                         div()
                             .id("sidebar-scroll")
+                            .w_full()
+                            .flex()
+                            .flex_col()
                             .flex_1()
                             .min_h_0()
                             .overflow_y_scroll()
@@ -1061,10 +1073,13 @@ impl Render for TuxScale {
                             )),
                     )
                     .child(if self.input.is_none() && !self.running {
-                        div().id("idle-scroll").w_full().h_full().overflow_y_scroll().pt(logical(88.)).pb_4()
-                        .child(div().min_h_full().flex().flex_col().items_center().justify_center()
+                        div().id("idle-scroll").w_full().h_full().overflow_y_scroll()
+                        .flex().flex_col().items_center()
+                        .pt(px(((f32::from(viewport.height) - 420. * self.interface_scale as f32 / 100.) / 2.).max(88. * self.interface_scale as f32 / 100.)))
+                        .pb_6()
+                        .child(div().w_full().flex().flex_col().items_center().flex_shrink_0()
                         .child(div()
-                            .w_full().max_w(logical(384.))
+                            .w_full().max_w(logical(424.)).flex_shrink_0()
                             .px_5()
                             .flex()
                             .flex_col()
@@ -1152,7 +1167,10 @@ impl Render for TuxScale {
                                         .map(
                                             |(n, t, s)| {
                                                 div()
+                                                    .w_full()
+                                                    .flex_shrink_0()
                                                     .flex()
+                                                    .items_start()
                                                     .gap_3()
                                                     .text_left()
                                                     .child(
@@ -1169,10 +1187,12 @@ impl Render for TuxScale {
                                                     )
                                                     .child(
                                                         div()
+                                                            .flex_1()
+                                                            .min_w_0()
                                                             .flex()
                                                             .flex_col()
-                                                            .child(t)
-                                                            .child(caption(s)),
+                                                            .child(div().w_full().child(t))
+                                                            .child(caption(s).w_full()),
                                                     )
                                             },
                                         ),
@@ -1281,5 +1301,35 @@ impl Render for TuxScale {
                             .into_any_element()
                     }),
             )
+    }
+}
+
+#[cfg(test)]
+mod layout_fixture {
+    use super::*;
+
+    // Interactive fixture for checking the empty state and settings at each zoom.
+    // Uses an isolated XDG_CONFIG_HOME when launched for visual checks.
+    #[::core::prelude::v1::test]
+    #[ignore = "opens a native window; requires a display"]
+    fn native_layout_fixture() {
+        Application::new()
+            .with_assets(crate::assets::Assets)
+            .run(|cx| {
+                cx.open_window(WindowOptions::default(), |window, cx| {
+                    window.set_window_title("TuxScale Layout Fixture");
+                    cx.new(|_| {
+                        let mut app = TuxScale::default();
+                        app.page = Page::Settings;
+                        app.interface_scale = std::env::var("TUXSCALE_LAYOUT_SCALE")
+                            .ok()
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(100);
+                        app
+                    })
+                })
+                .unwrap();
+                cx.activate(true);
+            });
     }
 }
