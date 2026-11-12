@@ -26,7 +26,9 @@ jobs:
             libxcb1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
             libxcb-xinput-dev libxcb-xkb-dev libxcb-render0-dev libxcb-shm0-dev \
             libwayland-dev libvulkan-dev libssl-dev libasound2-dev libudev-dev \
-            libdbus-1-dev libegl1-mesa-dev libgit2-dev zlib1g-dev ffmpeg
+            libdbus-1-dev libegl1-mesa-dev libgit2-dev zlib1g-dev ffmpeg \
+            ruby ruby-dev rpm libarchive-tools zstd squashfs-tools desktop-file-utils
+          sudo gem install fpm --version 1.17.0 --no-document
 
       - name: Set up Rust
         run: |
@@ -49,16 +51,20 @@ jobs:
       - name: Test native application
         run: cargo test --locked --manifest-path app/Cargo.toml
 
-      - name: Build Linux AppDir
-        run: bash app/scripts/package-linux.sh
-
-      - name: Archive native package
-        run: tar -C app/dist -czf app/dist/TuxScale-linux-x86_64.tar.gz TuxScale.AppDir
+      - name: Build and validate Linux packages
+        run: bash app/scripts/package-formats.sh
 
       - uses: actions/upload-artifact@v4
         with:
           name: tuxscale-native-linux
-          path: app/dist/TuxScale-linux-x86_64.tar.gz
+          path: |
+            app/dist/*.AppImage
+            app/dist/*.deb
+            app/dist/*.rpm
+            app/dist/*.pkg.tar.zst
+            app/dist/*.tar.gz
+            app/dist/SHA256SUMS
+          compression-level: 0
           if-no-files-found: error
 
   release-linux:
@@ -94,12 +100,12 @@ jobs:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
         shell: bash
         run: |
-          asset="dist/TuxScale-linux-x86_64.tar.gz"
-          test -s "$asset"
+          assets=(dist/*.AppImage dist/*.deb dist/*.rpm dist/*.pkg.tar.zst dist/*.tar.gz dist/SHA256SUMS)
+          for asset in "${assets[@]}"; do test -s "$asset"; done
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "$asset" --clobber
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
           else
-            gh release create "$RELEASE_TAG" "$asset" \
+            gh release create "$RELEASE_TAG" "${assets[@]}" \
               --target "$GITHUB_SHA" \
               --title "TuxScale $RELEASE_TAG" \
               --generate-notes

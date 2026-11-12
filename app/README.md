@@ -41,6 +41,6 @@ Python selection checks the custom executable in Settings, then `TUXSCALE_PYTHON
 
 - In-app video preview.
 - Expanded engine readiness checks and application update handling.
-- deb, rpm, and pacman packaging plus release workflow migration.
+- Flatpak packaging.
 
 Linux video processing requires FFmpeg and FFprobe on `PATH`. Inference also requires the bundled `resources/linux/bin/upscayl-bin` and the models under `resources/models`, or a working Python/PyTorch CUDA environment when PyTorch is selected. The legacy Electron/JavaScript application has been removed.

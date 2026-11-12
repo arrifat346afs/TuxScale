@@ -59,7 +59,7 @@ exec "$HERE/usr/bin/tuxscale" "$@"
 APPRUN
 chmod 755 "$appdir/AppRun"
 
-if command -v appimagetool >/dev/null 2>&1; then
+if [[ "${TUXSCALE_SKIP_APPIMAGE:-0}" != 1 ]] && command -v appimagetool >/dev/null 2>&1; then
   ARCH=x86_64 appimagetool "$appdir" "$(dirname "$appdir")/TuxScale-x86_64.AppImage"
 else
   echo "Created AppDir at $appdir (install appimagetool to produce an AppImage)."

@@ -30,7 +30,7 @@ FFmpeg and FFprobe must be on `PATH` for video processing. NCNN needs a working 
 - Progress, cancellation, process logs (`Ctrl+L`), and opening completed outputs.
 - NCNN/Vulkan inference and Python/PyTorch CUDA inference.
 
-The native migration still has gaps: in-app video playback, automatic application updates, and deb/rpm/pacman/Flatpak packaging are not implemented. See [native application details](app/README.md).
+The native migration still has gaps: in-app video playback, automatic application updates, and Flatpak packaging are not implemented. See [native application details](app/README.md).
 
 ## Python and PyTorch
 
@@ -60,7 +60,9 @@ bash app/scripts/package-linux.sh
 
 This creates `app/dist/TuxScale.AppDir`. If `appimagetool` is installed, it also creates an AppImage. The AppDir contains the native executable, model files, NCNN binary, Python workers, desktop metadata, and licenses. An existing bundled Python environment is included when present; otherwise, an installed environment is used. FFmpeg and the required graphics/system libraries must be available on the destination system.
 
-GitHub Actions builds and tests the Rust application and uploads a Linux AppDir archive. A manual **Run workflow** or a matching version tag also publishes that archive on the GitHub Releases page. The release tag follows the version in `app/Cargo.toml`; rerunning the workflow for the same version replaces its archive.
+GitHub Actions runs `bash app/scripts/package-formats.sh` to build AppImage, Debian `.deb`, Fedora `.rpm`, Arch/Pacman `.pkg.tar.zst`, and AppDir archives, plus `SHA256SUMS`. A manual **Run workflow** on `main` or a matching version tag publishes all formats on the GitHub Releases page. The release tag follows the version in `app/Cargo.toml`; rerunning the workflow for the same version replaces its packages. Local packaging requires FPM 1.17.0, Ruby, RPM tools, dpkg-deb, bsdtar, zstd, and squashfs-tools; the workflow installs these dependencies.
+
+Release binaries target x86-64 and glibc 2.39 or newer (Ubuntu 24.04+, Fedora 40+, and current Arch Linux). AppImage includes linked application libraries but requires the host graphics drivers, FFmpeg, and Python for the PyTorch backend. Package-manager formats declare their runtime dependencies. CUDA environments are configured separately.
 
 ## Project structure
 
