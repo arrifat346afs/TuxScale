@@ -25,7 +25,11 @@ pub(crate) struct Metadata {
 
 pub(crate) enum Event {
     Ready(Metadata),
-    Frame { pixels: Vec<u8>, position: f64 },
+    Frame {
+        pixels: Vec<u8>,
+        after: Option<Vec<u8>>,
+        position: f64,
+    },
     Ended,
     Error(String),
 }
@@ -83,6 +87,7 @@ impl Drop for Session {
 
 pub(crate) fn start(
     path: PathBuf,
+    after: Option<PathBuf>,
     start_seconds: f64,
     playing: bool,
 ) -> (Receiver<Event>, Session) {
@@ -93,6 +98,7 @@ pub(crate) fn start(
     let worker = thread::spawn(move || {
         let result = decode(
             &path,
+            after.as_deref(),
             start_seconds,
             playing,
             &worker_control,
@@ -221,12 +227,16 @@ fn parse_metadata(bytes: &[u8]) -> Result<Metadata, String> {
 
 fn decode(
     path: &Path,
+    after: Option<&Path>,
     start_seconds: f64,
     playing: bool,
     control: &Control,
     sender: &Sender<Event>,
 ) -> Result<(), String> {
-    let metadata = probe(path, control)?;
+    let mut metadata = probe(path, control)?;
+    if let Some(after) = after {
+        metadata.duration = metadata.duration.min(probe(after, control)?.duration);
+    }
     sender
         .send_blocking(Event::Ready(metadata))
         .map_err(|_| "Preview closed")?;
@@ -236,11 +246,26 @@ fn decode(
         0.
     };
     let mut command = crate::engine::host_command("ffmpeg");
-    command.args(["-v", "error", "-nostdin", "-ss", &format!("{position:.6}"), "-i"])
-        .arg(path)
-        .args(["-map", "0:v:0", "-an", "-sn", "-dn", "-vf",
-            "fps=24,scale=960:540:force_original_aspect_ratio=decrease,pad=960:540:(ow-iw)/2:(oh-ih)/2,setsar=1",
-            "-pix_fmt", "bgra", "-threads", "1"]);
+    command
+        .args([
+            "-v",
+            "error",
+            "-nostdin",
+            "-ss",
+            &format!("{position:.6}"),
+            "-i",
+        ])
+        .arg(path);
+    let filter = "setpts=PTS-STARTPTS,fps=24,scale=960:540:force_original_aspect_ratio=decrease,pad=960:540:(ow-iw)/2:(oh-ih)/2,setsar=1";
+    if let Some(after) = after {
+        command.args(["-ss", &format!("{position:.6}"), "-i"]).arg(after)
+            .args(["-filter_complex_threads", "1", "-filter_complex",
+                &format!("[0:v:0]{filter}[before];[1:v:0]{filter}[after];[before][after]hstack=inputs=2:shortest=1[out]"),
+                "-map", "[out]"]);
+    } else {
+        command.args(["-map", "0:v:0", "-vf", filter]);
+    }
+    command.args(["-an", "-sn", "-dn", "-pix_fmt", "bgra", "-threads", "1"]);
     if !playing {
         command.args(["-frames:v", "1"]);
     }
@@ -250,7 +275,8 @@ fn decode(
     let mut index = 0_u64;
     let result = (|| -> Result<(), String> {
         loop {
-            let mut pixels = vec![0_u8; (WIDTH * HEIGHT * 4) as usize];
+            let mut pixels =
+                vec![0_u8; (WIDTH * HEIGHT * 4) as usize * if after.is_some() { 2 } else { 1 }];
             let count = read_frame(&mut stdout, &mut pixels).map_err(|e| e.to_string())?;
             if count == 0 {
                 break;
@@ -271,9 +297,15 @@ fn decode(
                     (target - started.elapsed().min(target)).min(Duration::from_millis(10)),
                 );
             }
+            let (pixels, after) = if after.is_some() {
+                split_pair(pixels)
+            } else {
+                (pixels, None)
+            };
             sender
                 .send_blocking(Event::Frame {
                     pixels,
+                    after,
                     position: (position + index as f64 / FPS).min(metadata.duration),
                 })
                 .map_err(|_| "Preview closed")?;
@@ -297,6 +329,19 @@ fn decode(
         .send_blocking(Event::Ended)
         .map_err(|_| "Preview closed")?;
     Ok(())
+}
+
+// The two inputs share one FFmpeg filter clock and one output frame. Never
+// display a new source frame with an older result frame.
+fn split_pair(pixels: Vec<u8>) -> (Vec<u8>, Option<Vec<u8>>) {
+    let stride = (WIDTH * 4) as usize;
+    let mut before = Vec::with_capacity(stride * HEIGHT as usize);
+    let mut after = Vec::with_capacity(stride * HEIGHT as usize);
+    for row in pixels.chunks_exact(stride * 2) {
+        before.extend_from_slice(&row[..stride]);
+        after.extend_from_slice(&row[stride..]);
+    }
+    (before, Some(after))
 }
 
 fn read_frame(reader: &mut impl Read, bytes: &mut [u8]) -> IoResult<usize> {
@@ -356,14 +401,16 @@ mod tests {
             .status()
             .unwrap();
         assert!(status.success());
-        let (receiver, session) = start(path.clone(), 1., false);
+        let (receiver, session) = start(path.clone(), None, 1., false);
         let metadata = match receiver.recv_blocking().unwrap() {
             Event::Ready(m) => m,
             _ => panic!("metadata"),
         };
         assert!((metadata.duration - 2.).abs() < 0.1);
         match receiver.recv_blocking().unwrap() {
-            Event::Frame { pixels, position } => {
+            Event::Frame {
+                pixels, position, ..
+            } => {
                 assert_eq!(pixels.len(), (WIDTH * HEIGHT * 4) as usize);
                 assert!((position - 1.).abs() < 0.01);
                 // Center is red in BGRA; letterbox edges are black.
@@ -376,11 +423,46 @@ mod tests {
         }
         assert!(matches!(receiver.recv_blocking().unwrap(), Event::Ended));
         drop(session);
-        let (_receiver, session) = start(path.clone(), 0., true);
+        let (_receiver, session) = start(path.clone(), None, 0., true);
         thread::sleep(Duration::from_millis(500));
-        let start = Instant::now();
+        let cancelled_at = Instant::now();
         drop(session);
-        assert!(start.elapsed() < Duration::from_secs(2));
+        assert!(cancelled_at.elapsed() < Duration::from_secs(2));
+        // Compare a source to a larger encoded result. Paired frames
+        // must arrive at one timestamp, with equal display sizes after seeking.
+        let result_path = path.with_extension("result.mkv");
+        assert!(
+            crate::engine::host_command("ffmpeg")
+                .args(["-v", "error", "-y", "-i"])
+                .arg(&path)
+                .args(["-vf", "scale=320:240", "-c:v", "ffv1"])
+                .arg(&result_path)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let (receiver, session) = start(path.clone(), Some(result_path.clone()), 0.5, true);
+        assert!(matches!(receiver.recv_blocking().unwrap(), Event::Ready(_)));
+        for index in 0..3 {
+            match receiver.recv_blocking().unwrap() {
+                Event::Frame {
+                    pixels,
+                    after: Some(after),
+                    position,
+                } => {
+                    assert_eq!(pixels.len(), (WIDTH * HEIGHT * 4) as usize);
+                    assert_eq!(after.len(), pixels.len());
+                    assert!((position - (0.5 + index as f64 / FPS)).abs() < 0.001);
+                    let center = ((HEIGHT / 2 * WIDTH + WIDTH / 2) * 4) as usize;
+                    assert!(pixels[center + 2] > 200 && after[center + 2] > 200);
+                    assert_eq!(&pixels[0..3], &after[0..3]);
+                }
+                Event::Error(error) => panic!("{error}"),
+                _ => panic!("expected paired frame"),
+            }
+        }
+        drop(session);
+        std::fs::remove_file(result_path).unwrap();
         std::fs::remove_file(path).unwrap();
     }
 }

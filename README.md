@@ -27,7 +27,7 @@ FFmpeg and FFprobe must be on `PATH` for video processing. NCNN needs a working 
 - Model, scale, output format, quality, tile, and backend controls.
 - Adjustable interface scale (80% by default).
 - Full-area image preview and an interactive before/after reveal slider.
-- Embedded muted video preview with play/pause, seeking, and source/result selection.
+- Embedded muted video preview with play/pause, seeking, and a synchronized before/after reveal slider for completed videos.
 - Progress, cancellation, process logs (`Ctrl+L`), and opening completed outputs.
 - NCNN/Vulkan inference and Python/PyTorch CUDA inference.
 

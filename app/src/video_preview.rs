@@ -11,10 +11,11 @@ use std::{cell::Cell, path::PathBuf, rc::Rc, sync::Arc};
 pub(crate) struct VideoPreviewState {
     input: Option<PathBuf>,
     source: Option<PathBuf>,
-    show_output: bool,
+    output: Option<PathBuf>,
     session: Option<Session>,
     generation: u64,
     frame: Option<Arc<RenderImage>>,
+    after_frame: Option<Arc<RenderImage>>,
     duration: f64,
     dimensions: (u32, u32),
     position: f64,
@@ -34,9 +35,12 @@ impl TuxScale {
             if let Some(frame) = self.ui.video.frame.take() {
                 cx.drop_image(frame, Some(window));
             }
+            if let Some(frame) = self.ui.video.after_frame.take() {
+                cx.drop_image(frame, Some(window));
+            }
             self.ui.video.input = input.clone();
             self.ui.video.source = input;
-            self.ui.video.show_output = false;
+            self.ui.video.output = None;
             self.ui.video.duration = 0.;
             self.ui.video.dimensions = (0, 0);
             self.ui.video.position = 0.;
@@ -45,10 +49,24 @@ impl TuxScale {
                 self.decode_video(0., false, cx);
             }
         }
-        if self.ui.video.show_output && self.completed_output != self.ui.video.source {
-            self.ui.video.show_output = false;
-            self.ui.video.source = self.ui.video.input.clone();
-            self.decode_video(0., false, cx);
+        let output = if self.ui.video.input.is_some() {
+            self.completed_output.clone().filter(|p| {
+                matches!(
+                    p.extension().and_then(|s| s.to_str()),
+                    Some("mp4" | "mkv" | "mov" | "avi" | "webm")
+                )
+            })
+        } else {
+            None
+        };
+        if output != self.ui.video.output {
+            self.ui.video.output = output;
+            self.ui.preview.fraction = 0.5;
+            self.ui.preview.dragging = false;
+            if let Some(frame) = self.ui.video.after_frame.take() {
+                cx.drop_image(frame, Some(window));
+            }
+            self.decode_video(self.ui.video.position, false, cx);
         }
         // Free decoder resources when processing starts or the compact controls
         // page hides the preview. The currently displayed frame remains visible.
@@ -79,7 +97,8 @@ impl TuxScale {
         self.ui.video.position = position;
         self.ui.video.playing = playing;
         self.ui.video.message = "Loading video…".into();
-        let (events, session) = video_decode::start(path, position, playing);
+        let (events, session) =
+            video_decode::start(path, self.ui.video.output.clone(), position, playing);
         self.ui.video.session = Some(session);
         cx.spawn(async move |this, cx| {
             while let Ok(event) = events.recv().await {
@@ -93,7 +112,24 @@ impl TuxScale {
                                 this.ui.video.duration = meta.duration;
                                 this.ui.video.dimensions = (meta.width, meta.height);
                             }
-                            Event::Frame { pixels, position } => {
+                            Event::Frame {
+                                pixels,
+                                after,
+                                position,
+                            } => {
+                                if let Some(pixels) = after {
+                                    let buffer = image::RgbaImage::from_raw(
+                                        video_decode::WIDTH,
+                                        video_decode::HEIGHT,
+                                        pixels,
+                                    )
+                                    .unwrap();
+                                    let frame =
+                                        Arc::new(RenderImage::new(vec![image::Frame::new(buffer)]));
+                                    if let Some(old) = this.ui.video.after_frame.replace(frame) {
+                                        cx.drop_image(old, None);
+                                    }
+                                }
                                 if let Some(buffer) = image::RgbaImage::from_raw(
                                     video_decode::WIDTH,
                                     video_decode::HEIGHT,
@@ -155,12 +191,10 @@ impl TuxScale {
         };
         let bounds = Rc::new(Cell::new(Bounds::<Pixels>::default()));
         let paint_bounds = bounds.clone();
-        let can_show_output = self.completed_output.as_ref().is_some_and(|p| {
-            matches!(
-                p.extension().and_then(|s| s.to_str()),
-                Some("mp4" | "mkv" | "mov" | "avi" | "webm")
-            )
-        });
+        let after_frame = self.ui.video.after_frame.clone();
+        let comparing = after_frame.is_some();
+        let divider = self.ui.preview.fraction;
+        let preview_bounds = self.ui.preview.bounds.clone();
         div()
             .id("video-preview")
             .w_full()
@@ -171,18 +205,102 @@ impl TuxScale {
             .gap_2()
             .child(
                 div()
+                    .id("video-comparison")
                     .relative()
                     .w_full()
                     .flex_1()
                     .min_h(rems(10.))
                     .overflow_hidden()
                     .bg(rgb(0x000000))
-                    .when_some(frame, |d, frame| {
+                    .when(comparing, |d| {
+                        d.cursor(CursorStyle::ResizeLeftRight)
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(|this, event: &MouseDownEvent, _, cx| {
+                                    this.ui.preview.dragging = true;
+                                    this.ui.preview.move_to(event.position);
+                                    cx.stop_propagation();
+                                    cx.notify();
+                                }),
+                            )
+                            .on_click(|_, _, cx| cx.stop_propagation())
+                    })
+                    .when_some(after_frame, |d, after| {
                         d.child(
+                            img(after)
+                                .absolute()
+                                .size_full()
+                                .object_fit(ObjectFit::Contain),
+                        )
+                    })
+                    .when_some(frame, |d, frame| {
+                        let layer = div().relative().size_full().bg(rgb(0x000000)).child(
                             img(frame)
                                 .absolute()
                                 .size_full()
                                 .object_fit(ObjectFit::Contain),
+                        );
+                        if comparing {
+                            d.child(crate::preview::Reveal {
+                                image: layer.into_any_element(),
+                                fraction: divider,
+                            })
+                        } else {
+                            d.child(layer)
+                        }
+                    })
+                    .when(comparing, |d| {
+                        d.child(
+                            canvas(move |area, _, _| preview_bounds.set(area), |_, _, _, _| {})
+                                .absolute()
+                                .size_full(),
+                        )
+                        .child(
+                            div()
+                                .absolute()
+                                .left_3()
+                                .top_3()
+                                .px_3()
+                                .py_1()
+                                .rounded_md()
+                                .bg(rgba(0x101419dd))
+                                .text_xs()
+                                .child("Before"),
+                        )
+                        .child(
+                            div()
+                                .absolute()
+                                .right_3()
+                                .top_3()
+                                .px_3()
+                                .py_1()
+                                .rounded_md()
+                                .bg(rgba(0x101419dd))
+                                .text_xs()
+                                .child("After"),
+                        )
+                        .child(
+                            div()
+                                .absolute()
+                                .left(relative(divider))
+                                .top_0()
+                                .bottom_0()
+                                .ml(px(-1.))
+                                .w(px(2.))
+                                .bg(rgb(0xe5e9ee))
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .top(relative(0.5))
+                                        .left(px(-15.))
+                                        .size(px(32.))
+                                        .rounded_full()
+                                        .bg(rgb(0x161c24))
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .child("↔"),
+                                ),
                         )
                     })
                     .when(!self.ui.video.message.is_empty(), |d| {
@@ -259,25 +377,6 @@ impl TuxScale {
                             "{} × {}",
                             self.ui.video.dimensions.0, self.ui.video.dimensions.1
                         )))
-                    })
-                    .when(can_show_output, |d| {
-                        d.child(control(
-                            "video-source",
-                            if self.ui.video.show_output {
-                                "Show source"
-                            } else {
-                                "Show result"
-                            },
-                            cx.listener(|this, _, _, cx| {
-                                this.ui.video.show_output = !this.ui.video.show_output;
-                                this.ui.video.source = if this.ui.video.show_output {
-                                    this.completed_output.clone()
-                                } else {
-                                    this.input.clone()
-                                };
-                                this.decode_video(0., false, cx);
-                            }),
-                        ))
                     })
                     .child(control(
                         "video-retry",

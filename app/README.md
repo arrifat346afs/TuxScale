@@ -29,7 +29,7 @@ bash app/scripts/package-linux.sh
 - PyTorch CUDA environment setup with live installer progress and cancellation.
 - Video audio remuxing and audio-only extraction.
 - Full-area, aspect-preserving single-image preview; completed images use an aligned before/after reveal slider with mouse dragging and arrow/Home/End keyboard controls.
-- Embedded video preview displays a first frame on import, with muted play/pause, timeline seeking, ±5-second controls, and source/result selection. Decode runs off the UI thread at 960×540, with bounded frame buffering and cancellation on source changes.
+- Embedded video preview displays a first frame on import, with muted play/pause, timeline seeking, ±5-second controls, and a synchronized before/after reveal slider for completed videos. Decode runs off the UI thread at 960×540, with bounded frame buffering and cancellation on source changes.
 - Live worker logs, progress, cancellation, and opening the completed result.
 
 ## Python and PyTorch

@@ -8,7 +8,7 @@ pub struct PreviewState {
     pair: Option<(PathBuf, Option<PathBuf>)>,
     pub fraction: f32,
     pub dragging: bool,
-    bounds: Rc<Cell<Bounds<Pixels>>>,
+    pub(crate) bounds: Rc<Cell<Bounds<Pixels>>>,
     focus: Option<FocusHandle>,
 }
 impl Default for PreviewState {
@@ -31,9 +31,9 @@ impl PreviewState {
     }
 }
 
-struct Reveal {
-    image: AnyElement,
-    fraction: f32,
+pub(crate) struct Reveal {
+    pub(crate) image: AnyElement,
+    pub(crate) fraction: f32,
 }
 impl IntoElement for Reveal {
     type Element = Self;
