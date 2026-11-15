@@ -76,3 +76,7 @@ Release binaries target x86-64 and glibc 2.39 or newer (Ubuntu 24.04+, Fedora 40
 ## Credits
 
 TuxScale builds on [GPUI](https://gpui.rs/), [Upscayl NCNN](https://github.com/upscayl/upscayl-ncnn), and [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN). Icons are from Lucide; their license is included with the embedded assets.
+
+## Developer documentation
+
+See the [developer guide](docs/DEVELOPMENT.md) for the Rust/GPUI component structure, state and events, responsive layout, video comparison, processing backends, and packaging.
