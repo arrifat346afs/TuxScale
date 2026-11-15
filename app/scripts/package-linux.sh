@@ -55,6 +55,20 @@ install -m644 "$project_dir/resources/icon.png" "$appdir/io.github.arrifat346afs
 cat > "$appdir/AppRun" <<'APPRUN'
 #!/usr/bin/env sh
 HERE="$(dirname "$(readlink -f "$0")")"
+# Keep the host library search path so subprocesses such as FFmpeg and Python
+# can use their own libraries instead of the AppImage's bundled GUI libraries.
+# Missing and empty LD_LIBRARY_PATH are intentionally preserved separately.
+if [ -d "$HERE/usr/lib" ]; then
+  if [ "${TUXSCALE_APPIMAGE_ENV:-}" != 1 ]; then
+    if [ "${LD_LIBRARY_PATH+x}" = x ]; then
+      export TUXSCALE_ORIGINAL_LD_LIBRARY_PATH="$LD_LIBRARY_PATH"
+    else
+      unset TUXSCALE_ORIGINAL_LD_LIBRARY_PATH
+    fi
+  fi
+  export TUXSCALE_APPIMAGE_ENV=1
+  export LD_LIBRARY_PATH="$HERE/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
 exec "$HERE/usr/bin/tuxscale" "$@"
 APPRUN
 chmod 755 "$appdir/AppRun"

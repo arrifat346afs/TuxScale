@@ -30,8 +30,9 @@ struct Menu {
 #[derive(Default)]
 pub struct UiState {
     pub(super) preview_open: bool,
-    layout: crate::layout::Layout,
+    pub(super) layout: crate::layout::Layout,
     pub(super) preview: crate::preview::PreviewState,
+    pub(super) video: crate::video_preview::VideoPreviewState,
     focus: Option<FocusHandle>,
     menu: Option<Menu>,
     show_logs: bool,
@@ -809,6 +810,7 @@ impl Render for TuxScale {
             self.interface_scale,
         );
         self.ui.layout = layout;
+        self.sync_video_preview(window, cx);
         let compact = layout.compact;
         let image = self.mode == Mode::Image;
         let settings = self.page == Page::Settings;
@@ -1224,6 +1226,8 @@ impl Render for TuxScale {
                             ).w_full().text_ellipsis().flex_shrink_0())
                             .child(if image && !self.batch {
                                 self.image_preview(cx)
+                            } else if !image && !self.batch {
+                                self.video_preview(cx)
                             } else {
                                 div()
                                     .flex_1()

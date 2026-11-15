@@ -47,13 +47,8 @@ for soname in libfontconfig.so.1 libfreetype.so.6; do
     cp -L "$dependency" "$appdir/usr/lib/"
   done < <(ldd "$library" | awk '/=> \// {print $3}')
 done
-cat > "$appdir/AppRun" <<'APPRUN'
-#!/usr/bin/env sh
-HERE="$(dirname "$(readlink -f "$0")")"
-export LD_LIBRARY_PATH="$HERE/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-exec "$HERE/usr/bin/tuxscale" "$@"
-APPRUN
-chmod 755 "$appdir/AppRun"
+# package-linux.sh supplies the shared launcher, including the original host
+# library path snapshot that Rust restores when starting system tools.
 tool_dir="$(mktemp -d)"
 curl -fL --retry 3 https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage -o "$tool_dir/appimagetool"
 echo "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  $tool_dir/appimagetool" | sha256sum -c -

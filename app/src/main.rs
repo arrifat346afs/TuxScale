@@ -4,6 +4,8 @@ mod layout;
 mod preferences;
 mod preview;
 mod ui;
+mod video_decode;
+mod video_preview;
 
 use async_channel::{Receiver, Sender};
 use engine::{JobEvent, JobRequest};

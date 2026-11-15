@@ -55,6 +55,19 @@ def get_video_info(input_path: str, ffmpeg_bin: str = 'ffmpeg') -> Dict[str, Any
             'fps': fps,
             'total_frames': total_frames
         }
+    except subprocess.CalledProcessError as e:
+        detail = (e.stderr or '').strip() or 'No error details were returned.'
+        print(
+            f"ERROR: FFprobe exited with code {e.returncode}: {detail}",
+            file=sys.stderr, flush=True
+        )
+        sys.exit(3)
+    except FileNotFoundError:
+        print(
+            f"ERROR: FFprobe was not found ({ffprobe_bin}). Install FFmpeg/FFprobe and ensure it is on PATH.",
+            file=sys.stderr, flush=True
+        )
+        sys.exit(3)
     except Exception as e:
         print(f"ERROR: Failed to probe video with ffprobe: {e}", file=sys.stderr, flush=True)
         sys.exit(3)

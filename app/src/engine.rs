@@ -1,5 +1,6 @@
 use async_channel::Sender;
 use std::{
+    ffi::{OsStr, OsString},
     fs,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
@@ -38,6 +39,57 @@ pub enum JobEvent {
     Done(PathBuf),
     Failed(String),
     Cancelled,
+}
+
+/// System tools and installed Python environments must use the host's libraries,
+/// not the AppImage's Ubuntu libraries. Their children inherit this restored env.
+pub(crate) fn host_command(program: impl AsRef<OsStr>) -> Command {
+    let mut command = Command::new(program);
+    restore_host_environment(
+        &mut command,
+        std::env::var_os("TUXSCALE_APPIMAGE_ENV").as_deref() == Some(OsStr::new("1")),
+        std::env::var_os("TUXSCALE_ORIGINAL_LD_LIBRARY_PATH"),
+        std::env::var_os("APPDIR"),
+        std::env::var_os("LD_LIBRARY_PATH"),
+    );
+    command
+}
+
+fn restore_host_environment(
+    command: &mut Command,
+    appimage_environment: bool,
+    original: Option<OsString>,
+    appdir: Option<OsString>,
+    current: Option<OsString>,
+) {
+    let restored = if appimage_environment {
+        Some(original)
+    } else if let (Some(appdir), Some(current)) = (appdir, current) {
+        // Compatibility with older AppRun launchers that did not save the env.
+        let paths: Vec<_> = std::env::split_paths(&current)
+            .filter(|path| !path.starts_with(Path::new(&appdir)))
+            .collect();
+        Some(if paths.is_empty() {
+            None
+        } else {
+            std::env::join_paths(paths).ok()
+        })
+    } else {
+        None
+    };
+    if let Some(restored) = restored {
+        match restored {
+            Some(value) => {
+                command.env("LD_LIBRARY_PATH", value);
+            }
+            None => {
+                command.env_remove("LD_LIBRARY_PATH");
+            }
+        }
+        command
+            .env_remove("TUXSCALE_APPIMAGE_ENV")
+            .env_remove("TUXSCALE_ORIGINAL_LD_LIBRARY_PATH");
+    }
 }
 
 pub fn project_root() -> PathBuf {
@@ -144,23 +196,29 @@ pub fn runtime_summary(custom_python: Option<&Path>) -> String {
     let ncnn = project_root()
         .join("resources/linux/bin/upscayl-bin")
         .is_file();
-    let ffmpeg = Command::new("ffmpeg")
+    let ffmpeg = host_command("ffmpeg")
         .arg("-version")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
         .map(|s| s.success())
         .unwrap_or(false);
+    let ffprobe = check_media_tool("ffprobe").is_ok();
     let python = python_command(custom_python);
-    let pytorch = Command::new(&python)
+    let pytorch = host_command(&python)
         .args(["-c", "import torch; print('PyTorch ' + torch.__version__ + (' · CUDA ready · ' + torch.cuda.get_device_name(0) if torch.cuda.is_available() else ' · CUDA unavailable'))"])
         .output().ok().filter(|o| o.status.success())
         .and_then(|o| String::from_utf8(o.stdout).ok())
         .map(|s| s.trim().to_owned()).unwrap_or_else(|| "PyTorch not detected".into());
     format!(
-        "NCNN: {} · FFmpeg: {} · Models: {}\nPython: {}\n{}",
+        "NCNN: {} · FFmpeg: {} · FFprobe: {} · Models: {}\nPython: {}\n{}",
         if ncnn { "found" } else { "missing" },
         if ffmpeg { "found" } else { "missing" },
+        if ffprobe {
+            "found"
+        } else {
+            "missing or unavailable"
+        },
         if models_dir().is_dir() {
             "found"
         } else {
@@ -169,6 +227,21 @@ pub fn runtime_summary(custom_python: Option<&Path>) -> String {
         python,
         pytorch
     )
+}
+
+fn check_media_tool(program: &str) -> Result<(), String> {
+    let output = host_command(program).arg("-version").output().map_err(|error| {
+        format!("Could not start {program}: {error}. Install FFmpeg and FFprobe and ensure they are on PATH.")
+    })?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{program} exited with {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
+    }
 }
 
 pub fn run(request: JobRequest, events: Sender<JobEvent>, cancel: Arc<AtomicBool>) {
@@ -257,7 +330,7 @@ fn install_pytorch(
         ),
     );
     progress(events, 0.02, "Starting the PyTorch CUDA installer");
-    let mut command = Command::new("bash");
+    let mut command = host_command("bash");
     command.arg(script).arg(&environment).arg(models);
     run_command(command, events, cancel)?;
     Ok(environment.join("bin/python3"))
@@ -327,7 +400,7 @@ fn extract_audio(
     };
     log(events, format!("Extracting audio as {format}"));
     progress(events, 0.1, "Extracting audio");
-    let mut command = Command::new("ffmpeg");
+    let mut command = host_command("ffmpeg");
     command
         .arg("-y")
         .arg("-i")
@@ -433,7 +506,7 @@ fn run_pytorch_image(
     } else {
         0
     };
-    let mut command = Command::new(python_command(request.custom_python_path.as_deref()));
+    let mut command = host_command(python_command(request.custom_python_path.as_deref()));
     command
         .arg(script)
         .arg("--inputs")
@@ -463,6 +536,10 @@ fn run_videos(
     events: &Sender<JobEvent>,
     cancel: &Arc<AtomicBool>,
 ) -> Result<PathBuf, RunError> {
+    // Fail before loading a model or extracting frames, with the loader error
+    // visible when a system FFmpeg installation is broken.
+    check_media_tool("ffmpeg")?;
+    check_media_tool("ffprobe")?;
     let inputs = media_files(&request.input, false)?;
     if inputs.is_empty() {
         return Err("No supported video files were found.".into());
@@ -526,7 +603,7 @@ fn run_pytorch_video(
         std::process::id(),
         output.file_stem().unwrap_or_default().to_string_lossy()
     ));
-    let mut command = Command::new(python_command(request.custom_python_path.as_deref()));
+    let mut command = host_command(python_command(request.custom_python_path.as_deref()));
     command
         .arg(script)
         .arg("--input")
@@ -566,7 +643,7 @@ fn run_pytorch_video(
         "avi" => "mpeg4",
         _ => "libx264",
     };
-    let mut conversion = Command::new("ffmpeg");
+    let mut conversion = host_command("ffmpeg");
     conversion
         .arg("-y")
         .arg("-i")
@@ -597,7 +674,7 @@ fn run_ncnn_video(
     fs::create_dir_all(&upscaled)
         .map_err(|e| format!("Cannot create temporary output directory: {e}"))?;
     progress(events, 0.05, "Extracting video frames");
-    let mut extract = Command::new("ffmpeg");
+    let mut extract = host_command("ffmpeg");
     extract
         .arg("-y")
         .arg("-i")
@@ -714,7 +791,7 @@ fn run_ncnn_video(
         }
     }
     if result.is_ok() {
-        let fps = Command::new("ffprobe")
+        let fps = host_command("ffprobe")
             .args([
                 "-v",
                 "error",
@@ -737,7 +814,7 @@ fn run_ncnn_video(
             "avi" => vec!["-c:v", "mpeg4", "-pix_fmt", "yuv420p"],
             _ => vec!["-c:v", "libx264", "-pix_fmt", "yuv420p"],
         };
-        let mut assemble = Command::new("ffmpeg");
+        let mut assemble = host_command("ffmpeg");
         assemble
             .arg("-y")
             .arg("-i")
@@ -844,13 +921,108 @@ fn run_command(
             .try_wait()
             .map_err(|error| RunError::Failed(format!("Failed waiting for worker: {error}")))?
         {
-            Some(status) if status.success() => return Ok(()),
             Some(status) => {
+                // The process can exit before the reader threads deliver its last
+                // stderr lines. Keep those diagnostics instead of losing the cause.
+                while let Ok(line) = line_rx.recv_timeout(Duration::from_millis(200)) {
+                    if !line.trim().is_empty() {
+                        log(events, line);
+                    }
+                }
+                if status.success() {
+                    return Ok(());
+                }
                 return Err(RunError::Failed(format!(
                     "Worker exited with status {status}"
                 )));
             }
             None => thread::sleep(Duration::from_millis(80)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn library_path(command: &Command) -> Option<Option<OsString>> {
+        command
+            .get_envs()
+            .find(|(key, _)| *key == "LD_LIBRARY_PATH")
+            .map(|(_, value)| value.map(OsStr::to_os_string))
+    }
+
+    #[test]
+    fn host_tools_restore_appimage_callers_library_path() {
+        for original in [
+            None,
+            Some(OsString::new()),
+            Some(OsString::from("/opt/cuda/lib:/opt/custom/lib")),
+        ] {
+            let mut command = Command::new("ffprobe");
+            restore_host_environment(
+                &mut command,
+                true,
+                original.clone(),
+                Some("/tmp/appimage".into()),
+                Some("/tmp/appimage/usr/lib".into()),
+            );
+            assert_eq!(library_path(&command), Some(original));
+        }
+    }
+
+    #[test]
+    fn old_appimages_strip_only_their_own_library_directories() {
+        let mut command = Command::new("ffprobe");
+        restore_host_environment(
+            &mut command,
+            false,
+            None,
+            Some("/tmp/appimage".into()),
+            Some("/tmp/appimage/usr/lib:/opt/cuda/lib:/tmp/appimage-other/lib".into()),
+        );
+        assert_eq!(
+            library_path(&command),
+            Some(Some("/opt/cuda/lib:/tmp/appimage-other/lib".into()))
+        );
+    }
+
+    #[test]
+    fn ordinary_installs_keep_the_callers_environment() {
+        let mut command = Command::new("ffprobe");
+        restore_host_environment(
+            &mut command,
+            false,
+            None,
+            None,
+            Some("/opt/custom/lib".into()),
+        );
+        assert_eq!(library_path(&command), None);
+    }
+
+    #[test]
+    fn host_environment_is_inherited_by_grandchildren() {
+        let mut command = Command::new("sh");
+        command.env("LD_LIBRARY_PATH", "/tmp/appimage/usr/lib");
+        restore_host_environment(&mut command, true, None, None, None);
+        let output = command
+            .args(["-c", "sh -c 'printf %s \"${LD_LIBRARY_PATH-unset}\"'"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"unset");
+    }
+
+    #[test]
+    fn failed_workers_keep_their_final_error_line() {
+        let (events, receiver) = async_channel::unbounded();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let mut command = host_command("sh");
+        command.args(["-c", "echo 'ffprobe: symbol lookup error' >&2; exit 127"]);
+        assert!(matches!(
+            run_command(command, &events, &cancel),
+            Err(RunError::Failed(_))
+        ));
+        assert!(std::iter::from_fn(|| receiver.try_recv().ok()).any(|event| matches!(event, JobEvent::Log(message) if message.contains("symbol lookup error"))));
     }
 }

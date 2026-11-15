@@ -27,10 +27,11 @@ FFmpeg and FFprobe must be on `PATH` for video processing. NCNN needs a working 
 - Model, scale, output format, quality, tile, and backend controls.
 - Adjustable interface scale (80% by default).
 - Full-area image preview and an interactive before/after reveal slider.
+- Embedded muted video preview with play/pause, seeking, and source/result selection.
 - Progress, cancellation, process logs (`Ctrl+L`), and opening completed outputs.
 - NCNN/Vulkan inference and Python/PyTorch CUDA inference.
 
-The native migration still has gaps: in-app video playback, automatic application updates, and Flatpak packaging are not implemented. See [native application details](app/README.md).
+Video previews are muted and decoded at up to 960×540 for responsive playback; exported video retains its original audio handling and selected upscale resolution. Automatic application updates and Flatpak packaging are not implemented. See [native application details](app/README.md).
 
 ## Python and PyTorch
 

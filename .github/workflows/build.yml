@@ -51,6 +51,9 @@ jobs:
       - name: Test native application
         run: cargo test --locked --manifest-path app/Cargo.toml
 
+      - name: Test video preview decoding and cancellation
+        run: cargo test --locked --manifest-path app/Cargo.toml video_decode::tests::decodes_seeks_and_cancels_with_a_full_queue -- --ignored
+
       - name: Build and validate Linux packages
         run: bash app/scripts/package-formats.sh
 
