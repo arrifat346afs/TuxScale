@@ -2,6 +2,10 @@ name: Build Native Linux
 
 on:
   workflow_dispatch:
+    inputs:
+      release_run_id:
+        description: Existing build run ID to publish without rebuilding
+        required: false
   pull_request:
   push:
     branches: [main]
@@ -12,6 +16,7 @@ permissions:
 
 jobs:
   build-linux:
+    if: github.event_name != 'workflow_dispatch' || inputs.release_run_id == ''
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -87,10 +92,11 @@ jobs:
           if-no-files-found: error
 
   release-linux:
-    if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/v')
+    if: always() && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || startsWith(github.ref, 'refs/tags/v')) && (needs.build-linux.result == 'success' || inputs.release_run_id != '')
     needs: build-linux
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: write
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +118,8 @@ jobs:
         with:
           name: tuxscale-native-linux
           path: dist
+          run-id: ${{ inputs.release_run_id || github.run_id }}
+          github-token: ${{ github.token }}
 
       - name: Publish GitHub Release
         env:
@@ -119,13 +127,34 @@ jobs:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
         shell: bash
         run: |
-          assets=(dist/*.AppImage dist/*.deb dist/*.rpm dist/*.pkg.tar.zst dist/*.tar.gz dist/SHA256SUMS)
-          for asset in "${assets[@]}"; do test -s "$asset"; done
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
-          else
-            gh release create "$RELEASE_TAG" "${assets[@]}" \
+          (cd dist && sha256sum -c SHA256SUMS)
+          assets=()
+          for asset in dist/*.AppImage dist/*.deb dist/*.rpm dist/*.pkg.tar.zst dist/*.tar.gz; do
+            test -s "$asset"
+            if (( $(stat -c %s "$asset") >= 2147483648 )); then
+              split -b 1900M -d -a 2 "$asset" "$asset.part"
+              cat "$asset".part* | cmp - "$asset"
+              rm "$asset"
+              assets+=("$asset".part*)
+            else
+              assets+=("$asset")
+            fi
+          done
+          assets+=(dist/SHA256SUMS)
+          for asset in "${assets[@]}"; do test -s "$asset" && (( $(stat -c %s "$asset") < 2147483648 )); done
+          created=false
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
               --target "$GITHUB_SHA" \
               --title "TuxScale $RELEASE_TAG" \
-              --generate-notes
+              --generate-notes --draft
+            created=true
           fi
+          for asset in "${assets[@]}"; do
+            for attempt in 1 2 3; do
+              if gh release upload "$RELEASE_TAG" "$asset" --clobber; then break; fi
+              if (( attempt == 3 )); then exit 1; fi
+              sleep $((attempt * 10))
+            done
+          done
+          if "$created"; then gh release edit "$RELEASE_TAG" --draft=false; fi

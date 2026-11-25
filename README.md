@@ -61,9 +61,17 @@ bash app/scripts/package-linux.sh
 
 This creates `app/dist/TuxScale.AppDir`. If `appimagetool` is installed, it also creates an AppImage. The AppDir contains the native executable, model files, NCNN binary, Python workers and their CUDA environment, desktop metadata, and licenses. `app/scripts/bundle-python.sh` reuses a prepared `resources/python-env` or builds one into the AppDir and verifies its imports. FFmpeg and the required graphics/system libraries must be available on the destination system.
 
-GitHub Actions runs `bash app/scripts/package-formats.sh` to build AppImage, Debian `.deb`, Fedora `.rpm`, Arch/Pacman `.pkg.tar.zst`, and AppDir archives, plus `SHA256SUMS`. A manual **Run workflow** on `main` or a matching version tag publishes all formats on the GitHub Releases page. The release tag follows the version in `app/Cargo.toml`; rerunning the workflow for the same version replaces its packages. Local packaging requires FPM 1.17.0, Ruby, RPM tools, dpkg-deb, bsdtar, zstd, and squashfs-tools; the workflow installs these dependencies.
+GitHub Actions runs `bash app/scripts/package-formats.sh` to build AppImage, Debian `.deb`, Fedora `.rpm`, Arch/Pacman `.pkg.tar.zst`, and AppDir archives, plus `SHA256SUMS`. A manual **Run workflow** on `main` or a matching version tag publishes all formats on the GitHub Releases page. The release tag follows the version in `app/Cargo.toml`; rerunning the workflow for the same version replaces its packages. To retry a successful build without rebuilding, enter its Actions run ID in the `release_run_id` workflow input. Local packaging requires FPM 1.17.0, Ruby, RPM tools, dpkg-deb, bsdtar, zstd, and squashfs-tools; the workflow installs these dependencies.
 
-Release binaries target x86-64 and glibc 2.39 or newer (Ubuntu 24.04+, Fedora 40+, and current Arch Linux). AppImage includes linked application libraries but requires the host graphics drivers, FFmpeg, and Python for the PyTorch backend. Package-manager formats declare their runtime dependencies. CUDA environments are configured separately.
+Assets larger than GitHub's 2 GiB limit are published as numbered `.part00`, `.part01` files. Download every part of the package you want and `SHA256SUMS`, then reassemble and verify it. For example:
+
+```sh
+package=TuxScale-2.0.1-x86_64.AppImage
+cat "$package".part* > "$package"
+grep -F "  $package" SHA256SUMS | sha256sum -c -
+```
+
+Release binaries target x86-64 and glibc 2.39 or newer (Ubuntu 24.04+, Fedora 40+, and current Arch Linux). AppImage includes linked application libraries and a Python/PyTorch CUDA environment but requires the host graphics drivers and FFmpeg. Package-manager formats declare their runtime dependencies and include the same Python environment.
 
 ## Project structure
 
