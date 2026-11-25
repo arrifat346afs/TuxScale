@@ -16,15 +16,15 @@ common=(-s dir -n tuxscale -v "$version" --iteration 1 --architecture x86_64
 fpm "${common[@]}" -t deb -p "$dist/tuxscale_${version}_amd64.deb" \
   -d 'libc6 >= 2.39' -d libgcc-s1 -d libstdc++6 -d libgomp1 -d libxcb1 \
   -d libxkbcommon0 -d libxkbcommon-x11-0 -d libfontconfig1 -d libfreetype6 \
-  -d libvulkan1 -d libegl1 -d ffmpeg -d python3 usr
+  -d libvulkan1 -d libegl1 -d ffmpeg usr
 fpm "${common[@]}" -t rpm -p "$dist/tuxscale-${version}-1.x86_64.rpm" \
   -d 'glibc >= 2.39' -d libgcc -d libstdc++ -d libgomp -d libxcb \
   -d libxkbcommon -d libxkbcommon-x11 -d fontconfig -d freetype \
-  -d vulkan-loader -d libglvnd-egl -d ffmpeg-free -d python3 usr
+  -d vulkan-loader -d libglvnd-egl -d ffmpeg-free usr
 fpm "${common[@]}" -t pacman --pacman-compression zstd \
   -p "$dist/tuxscale-${version}-1-x86_64.pkg.tar.zst" \
   -d 'glibc >= 2.39' -d gcc-libs -d libxcb -d libxkbcommon -d libxkbcommon-x11 \
-  -d fontconfig -d freetype2 -d vulkan-icd-loader -d libglvnd -d ffmpeg -d python usr
+  -d fontconfig -d freetype2 -d vulkan-icd-loader -d libglvnd -d ffmpeg usr
 
 # Bundle linked libraries for AppImage; glibc and the host GPU drivers stay on
 # the target system. Native packages above use their package-manager dependencies.

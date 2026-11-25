@@ -45,7 +45,7 @@ echo "PROGRESS:50:Downloading and installing PyTorch with CUDA 12.4 (this may ta
 # 4. Install Real-ESRGAN, BasicSR, Spandrel, and NumPy
 echo "PROGRESS:75:Installing Real-ESRGAN, BasicSR, and Spandrel..."
 "$PYTHON_BIN" -m pip install --no-cache-dir \
-  basicsr realesrgan spandrel numpy \
+  basicsr realesrgan spandrel numpy opencv-python-headless \
   --no-build-isolation
 
 # 5. Patch BasicSR compatibility with modern torchvision
@@ -74,7 +74,7 @@ EOF
 
 # 6. Verify environment
 echo "PROGRESS:88:Verifying PyTorch CUDA acceleration..."
-"$PYTHON_BIN" -c "import torch, torchvision, realesrgan, basicsr, spandrel, numpy; print('✓ Verification passed: Torch', torch.__version__, '| CUDA:', torch.version.cuda, '| Available:', torch.cuda.is_available())"
+"$PYTHON_BIN" -c "import torch, torchvision, realesrgan, basicsr, spandrel, numpy, cv2; print('✓ Verification passed: Torch', torch.__version__, '| CUDA:', torch.version.cuda, '| Available:', torch.cuda.is_available())"
 
 # 7. Download default PyTorch model if missing
 WEIGHTS_PATH="$MODELS_DIR/realesr-animevideov3.pth"

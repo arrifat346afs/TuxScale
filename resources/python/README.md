@@ -29,7 +29,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 ### 3. Install Real-ESRGAN, Spandrel, and Dependencies
 
 ```bash
-pip install basicsr realesrgan spandrel numpy
+pip install basicsr realesrgan spandrel numpy opencv-python-headless
 ```
 
 > **Note on torchvision compatibility:**

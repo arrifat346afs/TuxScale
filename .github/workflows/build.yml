@@ -54,8 +54,24 @@ jobs:
       - name: Test video preview decoding and cancellation
         run: cargo test --locked --manifest-path app/Cargo.toml video_decode::tests::decodes_seeks_and_cancels_with_a_full_queue -- --ignored
 
+      - name: Free test build space for bundled packages
+        run: cargo clean --manifest-path app/Cargo.toml
+
       - name: Build and validate Linux packages
         run: bash app/scripts/package-formats.sh
+
+      - name: Verify complete bundled application
+        run: |
+          appdir=app/dist/TuxScale.AppDir
+          test -x "$appdir/AppRun"
+          test -x "$appdir/usr/bin/tuxscale"
+          test -x "$appdir/usr/share/tuxscale/resources/python-env/bin/python3"
+          test -f "$appdir/usr/share/tuxscale/resources/python/tuxscale_upscale.py"
+          test -f "$appdir/usr/share/tuxscale/resources/models/realesr-animevideov3.pth"
+          "$appdir/usr/share/tuxscale/resources/python-env/bin/python3" -c 'import torch, torchvision, realesrgan, basicsr, spandrel, numpy, cv2'
+          tar -tzf app/dist/TuxScale-linux-x86_64.tar.gz > "$RUNNER_TEMP/tuxscale-package-files.txt"
+          grep -Fx 'TuxScale.AppDir/usr/bin/tuxscale' "$RUNNER_TEMP/tuxscale-package-files.txt"
+          grep -Fx 'TuxScale.AppDir/usr/share/tuxscale/resources/python-env/bin/python3' "$RUNNER_TEMP/tuxscale-package-files.txt"
 
       - uses: actions/upload-artifact@v4
         with:

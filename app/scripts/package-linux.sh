@@ -18,9 +18,7 @@ install -m755 "$project_dir/app/target/$binary_dir/tuxscale" "$appdir/usr/bin/tu
 for resource in models python linux; do
   cp -a "$project_dir/resources/$resource" "$appdir/usr/share/tuxscale/resources/"
 done
-if [ -x "$project_dir/resources/python-env/bin/python3" ]; then
-  cp -a "$project_dir/resources/python-env" "$appdir/usr/share/tuxscale/resources/"
-fi
+bash "$project_dir/app/scripts/bundle-python.sh" "$appdir"
 install -m644 "$project_dir/resources/icon.png" \
   "$appdir/usr/share/icons/hicolor/512x512/apps/io.github.arrifat346afs.TuxScale.png"
 cat > "$appdir/io.github.arrifat346afs.TuxScale.desktop" <<'DESKTOP'

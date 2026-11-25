@@ -37,7 +37,7 @@ Video previews are muted and decoded at up to 960×540 for responsive playback; 
 
 Python is needed only for the PyTorch backend. The Rust app launches the image or video worker under `resources/python/` and reads its progress and logs.
 
-Existing environments are reused. Selection checks the executable chosen in Settings, `TUXSCALE_PYTHON_PATH`, bundled `resources/python-env`, the TuxScale configuration environment, and `~/.venvs/tuxscale`, before falling back to `python3` on `PATH`. Choose **PyTorch (CUDA)** in Settings and use **Refresh engine status** to inspect the resolved interpreter and CUDA availability.
+Packaged builds include a Python and PyTorch CUDA environment alongside the native app; users do not need to install Python. Selection checks the executable chosen in Settings, `TUXSCALE_PYTHON_PATH`, then the bundled `resources/python-env`. Development builds can also use the TuxScale configuration environment, `~/.venvs/tuxscale`, or `python3` on `PATH`. Choose **PyTorch (CUDA)** in Settings and use **Refresh engine status** to inspect the resolved interpreter and CUDA availability.
 
 See [Python setup](resources/python/README.md) if an environment is not already available. Python environments are not stored in Git.
 
@@ -59,7 +59,7 @@ The interactive native preview test is ignored by default because it needs a dis
 bash app/scripts/package-linux.sh
 ```
 
-This creates `app/dist/TuxScale.AppDir`. If `appimagetool` is installed, it also creates an AppImage. The AppDir contains the native executable, model files, NCNN binary, Python workers, desktop metadata, and licenses. An existing bundled Python environment is included when present; otherwise, an installed environment is used. FFmpeg and the required graphics/system libraries must be available on the destination system.
+This creates `app/dist/TuxScale.AppDir`. If `appimagetool` is installed, it also creates an AppImage. The AppDir contains the native executable, model files, NCNN binary, Python workers and their CUDA environment, desktop metadata, and licenses. `app/scripts/bundle-python.sh` reuses a prepared `resources/python-env` or builds one into the AppDir and verifies its imports. FFmpeg and the required graphics/system libraries must be available on the destination system.
 
 GitHub Actions runs `bash app/scripts/package-formats.sh` to build AppImage, Debian `.deb`, Fedora `.rpm`, Arch/Pacman `.pkg.tar.zst`, and AppDir archives, plus `SHA256SUMS`. A manual **Run workflow** on `main` or a matching version tag publishes all formats on the GitHub Releases page. The release tag follows the version in `app/Cargo.toml`; rerunning the workflow for the same version replaces its packages. Local packaging requires FPM 1.17.0, Ruby, RPM tools, dpkg-deb, bsdtar, zstd, and squashfs-tools; the workflow installs these dependencies.
 

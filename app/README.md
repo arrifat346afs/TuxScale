@@ -36,7 +36,7 @@ bash app/scripts/package-linux.sh
 
 The PyTorch backend uses Python. Rust starts the existing `resources/python/tuxscale_upscale_images.py` or `resources/python/tuxscale_upscale.py` worker as a child process and receives its logs and progress. NCNN does not use Python.
 
-Python selection checks the custom executable in Settings, then `TUXSCALE_PYTHON_PATH`, the bundled `resources/python-env`, the TuxScale environment under the configuration directory, `~/.config/tuxscale/pytorch-env`, and `~/.venvs/tuxscale`, before falling back to `python3` on PATH. An existing working PyTorch/CUDA environment can be reused without installing another one. Refresh Engine Status shows the resolved executable and CUDA status.
+Python selection checks the custom executable in Settings, then `TUXSCALE_PYTHON_PATH`, then the bundled `resources/python-env`. Development builds can also use the TuxScale environment under the configuration directory, `~/.config/tuxscale/pytorch-env`, `~/.venvs/tuxscale`, or `python3` on PATH. Linux packages include the native app and ready Python environment together. Refresh Engine Status shows the resolved executable and CUDA status.
 
 ## Remaining parity work
 

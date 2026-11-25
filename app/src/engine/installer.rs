@@ -3,7 +3,7 @@ use super::{JobEvent, RunError};
 use super::{
     events::{log, progress},
     process::{host_command, run_command},
-    runtime::{config_dir, project_root},
+    runtime::{config_dir, installed_root, project_root},
 };
 use async_channel::Sender;
 use std::{
@@ -15,6 +15,17 @@ pub(super) fn install_pytorch(
     events: &Sender<JobEvent>,
     cancel: &Arc<AtomicBool>,
 ) -> Result<PathBuf, RunError> {
+    let bundled = project_root().join("resources/python-env/bin/python3");
+    if bundled.is_file() {
+        log(
+            events,
+            format!("Using bundled Python at {}", bundled.display()),
+        );
+        return Ok(bundled);
+    }
+    if installed_root().is_some() {
+        return Err(format!("Bundled Python is missing: {}", bundled.display()).into());
+    }
     let script = project_root().join("resources/python/setup-cuda-env.sh");
     if !script.is_file() {
         return Err(format!("PyTorch setup script is missing: {}", script.display()).into());

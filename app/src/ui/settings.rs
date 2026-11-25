@@ -83,12 +83,14 @@ impl TuxScale {
                             .map(|p| p.display().to_string())
                             .unwrap_or("Auto-detect Python".into()),
                     ))
-                    .child(button(
-                        "Install PyTorch CUDA environment",
-                        false,
-                        self.running,
-                        cx.listener(|this, _, w, cx| this.start_installer(w, cx)),
-                    )),
+                    .when(!engine::is_packaged(), |panel| {
+                        panel.child(button(
+                            "Install PyTorch CUDA environment",
+                            false,
+                            self.running,
+                            cx.listener(|this, _, w, cx| this.start_installer(w, cx)),
+                        ))
+                    }),
             )
             .child(
                 panel()

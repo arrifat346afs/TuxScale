@@ -6,8 +6,8 @@ use std::{
     process::Stdio,
 };
 
-pub(crate) fn project_root() -> PathBuf {
-    if let Some(installed_data) = std::env::current_exe()
+pub(super) fn installed_root() -> Option<PathBuf> {
+    std::env::current_exe()
         .ok()
         .and_then(|executable| {
             executable
@@ -16,13 +16,19 @@ pub(crate) fn project_root() -> PathBuf {
                 .map(|prefix| prefix.join("share/tuxscale"))
         })
         .filter(|path| path.join("resources").is_dir())
-    {
-        return installed_data;
-    }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap_or(Path::new("."))
-        .to_path_buf()
+}
+
+pub(crate) fn is_packaged() -> bool {
+    installed_root().is_some()
+}
+
+pub(crate) fn project_root() -> PathBuf {
+    installed_root().unwrap_or_else(|| {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_path_buf()
+    })
 }
 
 pub(super) fn models_dir() -> PathBuf {
@@ -109,6 +115,12 @@ pub(super) fn python_command(custom_path: Option<&Path>) -> String {
         if !custom.trim().is_empty() {
             return custom;
         }
+    }
+    if let Some(installed) = installed_root() {
+        return installed
+            .join("resources/python-env/bin/python3")
+            .to_string_lossy()
+            .into_owned();
     }
     let root = project_root();
     let mut candidates = vec![

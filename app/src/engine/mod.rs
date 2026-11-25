@@ -11,7 +11,7 @@ mod runtime;
 mod videos;
 
 pub(crate) use process::host_command;
-pub(crate) use runtime::{models_for, runtime_summary};
+pub(crate) use runtime::{is_packaged, models_for, runtime_summary};
 
 use async_channel::Sender;
 use images::run_images;
